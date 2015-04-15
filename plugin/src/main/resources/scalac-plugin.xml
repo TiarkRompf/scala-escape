@@ -1,0 +1,4 @@
+<plugin>
+  <name>escape</name>
+  <classname>scala.tools.escape.EscPlugin</classname>
+</plugin>
