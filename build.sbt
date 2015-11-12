@@ -12,6 +12,7 @@ lazy val commonSettings = scalaModuleSettings ++ Seq(
   snapshotScalaBinaryVersion := "2.11.4",
   scalacOptions ++= Seq(
     "-deprecation",
+    "-Xexperimental", // SAM closures
     "-feature")
 )
 

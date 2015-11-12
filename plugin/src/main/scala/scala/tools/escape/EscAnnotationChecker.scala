@@ -27,6 +27,23 @@ abstract class EscAnnotationChecker extends EscUtils {
         return true
 
 
+/*
+      val annL1 = hasLocalMarker(tpe1)
+      val annL2 = hasLocalMarker(tpe2)
+
+      if (annL1 || annL2)
+        vprintln("check safe: " + tpe1.withoutAnnotations + " " + annL1 + " <:< " + tpe2.withoutAnnotations + " " + annL2)
+
+      if (annL1 && !annL2) // A <: A @local but not A @local <: A
+        return false
+
+      if (annL1 && annL2)
+        return true // premature?
+*/
+
+      // ----
+
+
       val annS1 = safeArgAnn(tpe1)
       val annS2 = safeArgAnn(tpe2)
 

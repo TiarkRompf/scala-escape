@@ -10,7 +10,7 @@ import scala.language.{ implicitConversions, higherKinds }
 import scala.util.escape._
 import scala.util.control.Exception
 
-
+/*
 class Basic extends CompilerTesting {
   @Test def test10 = {
     val x = 100
@@ -37,7 +37,125 @@ class Basic extends CompilerTesting {
   """)
 
 }
+*/
 
+class Local extends CompilerTesting {
+  @Test def test10: Unit = {
+    class IO
+    def println(s:String)(@local io: IO) = Console.println(s)
+
+    def foo(f: Int->Int) = f(1)
+
+    def g(@local x: Int) = 2 // return x should fail
+
+    foo(x => 2*g(x))
+  }
+
+  @Test def test11: Unit = {
+    class IO
+    def println(s:String)(@local io: IO) = Console.println(s)
+
+    @local val io = new IO
+
+    def foo = println("foo")(io)  // fails
+
+    @local def bar = println("bar")(io)  // ok
+  }
+
+  @Test def test12: Unit = {
+    class IO
+    def println(s:String)(implicit @local io: IO) = Console.println(s)
+
+    implicit @local val io = new IO
+
+    val foo = () => println("foo")  // fails
+
+    @local val bar = () => println("bar")  // ok
+
+    def handler(@local f: Int => Int) = f(7)
+
+    handler { x => bar(); 2 }
+  }
+
+  @Test def test13: Unit = {
+
+    abstract class A {
+      def foo(@local x: Int): Int
+    }
+
+    class B extends A {
+      def foo(x: Int): Int = x      
+    }
+
+    @local val y = 8
+
+    val b: A = new B
+    b.foo(y)
+  }
+
+  @Test def test14: Unit = {
+
+    val f = new java.io.File("foo")
+    val s = ESC.NO(f.getCanonicalPath())
+  }
+
+  @Test def test15: Unit = {
+
+    trait MySeq[A] {
+
+      type LT
+      type plocal = local[LT]
+
+      def foreach(@plocal f: A => Unit): Unit
+
+      def map[B](@plocal f: A => B) = {
+        var b: B = null.asInstanceOf[B]
+        foreach { x => b = f(x) }
+        b
+      }
+
+    }
+
+    trait MyList[A] extends MySeq[A] {
+      type LT = Any
+      def foreach(@local f: A => Unit): Unit = { }
+    }
+
+    trait MyStream[A] extends MySeq[A] {
+      type LT = Nothing
+      def foreach(f: A => Unit): Unit = { }
+    }
+
+    @local def println(x: Any): Unit = ()
+
+    val xl = new MyList[Int] {}
+    val xs = new MyStream[Int] {}
+
+    xl.foreach(x => println(x)) // ok
+    xs.foreach(x => println(x)) // error
+
+
+  }
+
+
+
+/*
+  @Test def test20 = expectEscErrorOutput(
+    "value x not safe (not declared as such by return type of f = (a: Int)Int!\n"+
+    "couldn't prove that object returned from f(a) does not point to Set(value x)",
+  """
+    val x = 100
+    val y = 99
+
+    def f(a:Int): Int = a
+    def g(a:Int): Int @safe(x) = f(a) // not safe
+  """)
+*/
+}
+
+
+
+/*
 class TryCatch extends CompilerTesting {
 
   @Test def trycatch1: Unit = { () =>
@@ -131,5 +249,5 @@ class TryCatch extends CompilerTesting {
     }
   """)
 
-
 }
+*/

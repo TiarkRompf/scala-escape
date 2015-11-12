@@ -12,14 +12,18 @@ trait EscUtils {
 
 
   lazy val MarkerSafe = rootMirror.getRequiredClass("scala.util.escape.safe")
+  lazy val MarkerLocal = rootMirror.getRequiredClass("scala.util.escape.local")
 
   protected def newSafeMarker() = newMarker(MarkerSafe)
+  protected def newLocalMarker() = newMarker(MarkerLocal)
+  protected def newLocalMarker(tpe: Type) = newMarker(appliedType(MarkerLocal, tpe))
   protected def newMarker(tpe: Type): AnnotationInfo = AnnotationInfo marker tpe
   protected def newMarker(sym: Symbol): AnnotationInfo = AnnotationInfo marker sym.tpe
 
   // annotation checker
 
   protected def hasSafeMarker(tpe: Type)   = tpe hasAnnotation MarkerSafe
+  protected def hasLocalMarker(tpe: Type)   = tpe hasAnnotation MarkerLocal
 
   def filterAttribs(tpe:Type, cls:Symbol) =
     tpe.annotations filter (_ matches cls)
@@ -39,5 +43,7 @@ trait EscUtils {
         case t => error("wrong shape of @safe annotation: " + t); Nil
       }
   }.toSet
+
+
 
 }
