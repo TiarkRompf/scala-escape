@@ -23,13 +23,11 @@ Inductive var : Type :=
   | VSnd  : id -> var
 .
 
-
-
 Inductive tm : Type :=
   | ttrue : tm
   | tfalse : tm
-(*  | tvar : var -> tm *)
-  | tvar : id -> tm
+  (*| tvar : var -> tm*) 
+  | tvar : var -> tm
   | tapp : tm -> tm -> tm (* f(x) *)
   | tabs : tm -> tm (* \f x.y *)
 .
@@ -39,8 +37,8 @@ Inductive vl : Type :=
 | vabs  : list vl -> tm -> vl
 .
 
-Definition env {X: Type} := (list X, list X, nat).
-
+Inductive env (X: Type) :=
+  | Def : list X -> list X -> nat -> env X.
 Definition venv := env vl.
 Definition tenv := env ty.
 
@@ -60,10 +58,14 @@ Fixpoint index {X : Type} (n : id) (l : list X) : option X :=
   end.
 
 Fixpoint lookup {X : Type} (n : var) (l : env X) : option X :=
-  match n with
-    | VFst => ... index first ...
-    | VSnd => ... index second ...
-  end.
+  match l with
+    | Def l1 l2 m =>
+         match n with
+           | VFst idx => index idx l1
+           | VSnd idx => if ble_nat idx m then None else index idx l2
+         end
+   end
+.
 
 
 
