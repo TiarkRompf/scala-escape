@@ -18,9 +18,17 @@ Inductive ty : Type :=
   | TFun   : ty -> ty -> ty
 .
 
+Inductive var : Type :=
+  | VFst  : id -> var
+  | VSnd  : id -> var
+.
+
+
+
 Inductive tm : Type :=
   | ttrue : tm
   | tfalse : tm
+(*  | tvar : var -> tm *)
   | tvar : id -> tm
   | tapp : tm -> tm -> tm (* f(x) *)
   | tabs : tm -> tm (* \f x.y *)
@@ -31,8 +39,10 @@ Inductive vl : Type :=
 | vabs  : list vl -> tm -> vl
 .
 
-Definition venv := list vl.
-Definition tenv := list ty.
+Definition env {X: Type} := (list X, list X, nat).
+
+Definition venv := env vl.
+Definition tenv := env ty.
 
 Hint Unfold venv.
 Hint Unfold tenv.
@@ -48,6 +58,13 @@ Fixpoint index {X : Type} (n : id) (l : list X) : option X :=
     | [] => None
     | a :: l'  => if beq_nat n (length l') then Some a else index n l'
   end.
+
+Fixpoint lookup {X : Type} (n : var) (l : env X) : option X :=
+  match n with
+    | VFst => ... index first ...
+    | VSnd => ... index second ...
+  end.
+
 
 
 Inductive has_type : tenv -> tm -> ty -> Prop :=
