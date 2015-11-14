@@ -57,7 +57,7 @@ Fixpoint index {X : Type} (n : id) (l : list X) : option X :=
     | a :: l'  => if beq_nat n (length l') then Some a else index n l'
   end.
 
-Fixpoint lookup {X : Type} (n : var) (l : env X) : option X :=
+Definition lookup {X : Type} (n : var) (l : env X) : option X :=
   match l with
     | Def l1 l2 m =>
          match n with
@@ -67,6 +67,14 @@ Fixpoint lookup {X : Type} (n : var) (l : env X) : option X :=
    end
 .
 
+Definition sanitize_env {X : Type} (n : var) (l : env X) : env X :=
+   match n with
+   | VFst idx => match l with
+                 | Def l1 l2 m => Def X l1 l2 (length l2)
+                 end
+   | VSnd idx => l
+end
+.
 
 
 Inductive has_type : tenv -> tm -> ty -> Prop :=
@@ -75,7 +83,7 @@ Inductive has_type : tenv -> tm -> ty -> Prop :=
 | t_false: forall env,
            has_type env tfalse TBool
 | t_var: forall x env T1,
-           index x env = Some T1 ->
+           lookup x (sanitize_env env x) = Some T1 ->
            has_type env (tvar x) T1
 | t_app: forall env f x T1 T2,
            has_type env f (TFun T1 T2) ->
