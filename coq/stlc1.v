@@ -67,31 +67,52 @@ Definition lookup {X : Type} (n : var) (l : env X) : option X :=
    end
 .
 
-Definition sanitize_env {X : Type} (n : var) (l : env X) : env X :=
-   match n with
-   | VFst idx => match l with
-                 | Def l1 l2 m => Def X l1 l2 (length l2)
-                 end
-   | VSnd idx => l
+Inductive class : Type :=
+  | First : class
+  | Second : class
+.
+
+Definition get_class (n : var) : class :=
+match n with
+| VFst _ => First
+| VSnd _ => Second
 end
 .
 
+Definition sanitize_env {X : Type} (c : class) (l : env X) : env X :=
+   match c with
+   | First => match l with
+                 | Def l1 l2 _ => Def X l1 l2 (length l2)
+                 end
+   | Second => l
+end
+.
 
-Inductive has_type : tenv -> tm -> ty -> Prop :=
-| t_true: forall env,
-           has_type env ttrue TBool
-| t_false: forall env,
-           has_type env tfalse TBool
-| t_var: forall x env T1,
-           lookup x (sanitize_env env x) = Some T1 ->
-           has_type env (tvar x) T1
-| t_app: forall env f x T1 T2,
-           has_type env f (TFun T1 T2) ->
-           has_type env x T1 ->
-           has_type env (tapp f x) T2
-| t_abs: forall env y T1 T2,
-           has_type (T1::(TFun T1 T2)::env) y T2 -> 
-           has_type env (tabs y) (TFun T1 T2)
+Definition expand_env {X : Type} (l : env X) (x : X) (c : class) : (env X) :=
+match l with
+| Def l1 l2 m =>
+   match c with
+   | First => Def X (x::l1) l2 m
+   | Second => Def X l1 (x::l2) m
+   end
+end
+.
+
+Inductive has_type : class -> tenv -> tm -> ty -> Prop :=
+| t_true: forall c env,
+           has_type c env ttrue TBool
+| t_false: forall c env,
+           has_type c env tfalse TBool
+| t_var: forall c x env T1,
+           lookup x (sanitize_env c env) = Some T1 ->
+           has_type c env (tvar x) T1
+| t_app: forall c c' env f x T1 T2,
+           has_type Second env f (TFun T1 T2) ->
+           has_type c env x T1 ->
+           has_type c' env (tapp f x) T2
+| t_abs: forall c c' env y T1 T2,
+           has_type First (expand_env (sanitize_env c env) T1 c') y T2 ->
+           has_type c env (tabs y) (TFun T1 T2)
 .
 
 Inductive wf_env : venv -> tenv -> Prop := 
