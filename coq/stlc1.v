@@ -43,7 +43,7 @@ Inductive env (X: Type) :=
 
 Inductive vl : Type :=
 | vbool : bool -> vl
-| vabs  : env vl -> tm -> vl
+| vabs  : env vl -> class -> tm -> vl
 .
 
 Definition venv := env vl.
@@ -123,7 +123,7 @@ with val_type : venv -> vl -> ty -> Prop :=
 | v_abs: forall env venv tenv y T1 T2 m,
     wf_env venv tenv ->
     has_type (expand_env tenv T1 m) y m T2 ->
-    val_type env (vabs venv y) (TFun T1 m T2)
+    val_type env (vabs venv m y) (TFun T1 m T2)
 .
 
 Inductive stp: venv -> ty -> venv -> ty -> Prop :=
@@ -140,27 +140,27 @@ Some (Some v))   means result v
 Could use do-notation to clean up syntax.
  *)
 
-Fixpoint teval(n: nat)(env: venv)(t: tm){struct n}: option (option vl) :=
-  match n with
+Fixpoint teval(k: nat)(env: venv)(t: tm)(n: class){struct k}: option (option vl) :=
+  match k with
     | 0 => None
-    | S n =>
+    | S k' =>
       match t with
         | ttrue      => Some (Some (vbool true))
         | tfalse     => Some (Some (vbool false))
-        | tvar x     => Some (index x env)
-        | tabs y     => Some (Some (vabs env y))
+        | tvar x     => Some (lookup x (sanitize_env n env))
+        | tabs m y   => Some (Some (vabs (sanitize_env n env) m y))
         | tapp ef ex   =>
-          match teval n env ex with
-            | None => None
-            | Some None => Some None
-            | Some (Some vx) =>
-              match teval n env ef with
-                | None => None
-                | Some None => Some None
-                | Some (Some (vbool _)) => Some None
-                | Some (Some (vabs env2 ey)) =>
-                  teval n (vx::(vabs env2 ey)::env2) ey
-              end
+           match teval k' env ef Second with
+             | None => None
+             | Some None => Some None
+             | Some (Some (vbool _)) => Some None
+             | Some (Some (vabs env2 m ey)) =>
+                match teval k' env ex m with
+                  | None => None
+                  | Some None => Some None
+                  | Some (Some vx) =>
+                       teval k' (expand_env env2 vx m) ey First
+                end
           end
       end
   end.
