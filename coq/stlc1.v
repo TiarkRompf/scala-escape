@@ -99,20 +99,20 @@ end
 .
 
 Inductive has_type : class -> tenv -> tm -> ty -> Prop :=
-| t_true: forall c env,
-           has_type c env ttrue TBool
-| t_false: forall c env,
-           has_type c env tfalse TBool
-| t_var: forall c x env T1,
-           lookup x (sanitize_env c env) = Some T1 ->
-           has_type c env (tvar x) T1
-| t_app: forall c c' env f x T1 T2,
+| t_true: forall n env,
+           has_type n env ttrue TBool
+| t_false: forall n env,
+           has_type n env tfalse TBool
+| t_var: forall n x env T1,
+           lookup x (sanitize_env n env) = Some T1 ->
+           has_type n env (tvar x) T1
+| t_app: forall m n env f x T1 T2,
            has_type Second env f (TFun T1 T2) ->
-           has_type c env x T1 ->
-           has_type c' env (tapp f x) T2
-| t_abs: forall c c' env y T1 T2,
-           has_type First (expand_env (sanitize_env c env) T1 c') y T2 ->
-           has_type c env (tabs y) (TFun T1 T2)
+           has_type m env x T1 ->
+           has_type n env (tapp f x) T2
+| t_abs: forall m n env y T1 T2,
+           has_type First (expand_env (sanitize_env n env) T1 m) y T2 ->
+           has_type n env (tabs y) (TFun T1 T2)
 .
 
 Inductive wf_env : venv -> tenv -> Prop := 
