@@ -38,13 +38,14 @@ Inductive tm : Type :=
   | tabs : class -> tm -> tm (* \f x.y *)
 .
 
-Inductive vl : Type :=
-| vbool : bool -> vl
-| vabs  : list vl -> tm -> vl
-.
-
 Inductive env (X: Type) :=
   | Def : list X -> list X -> nat -> env X.
+
+Inductive vl : Type :=
+| vbool : bool -> vl
+| vabs  : env vl -> tm -> vl
+.
+
 Definition venv := env vl.
 Definition tenv := env ty.
 
@@ -110,19 +111,19 @@ Inductive has_type : tenv -> tm -> class -> ty -> Prop :=
 .
 
 Inductive wf_env : venv -> tenv -> Prop := 
-| wfe_nil : wf_env nil nil
-| wfe_cons : forall v t vs ts,
-    val_type (v::vs) v t ->
+| wfe_nil : wf_env (Def vl nil nil O) (Def ty nil nil O) 
+| wfe_cons : forall v t vs ts n,
+    val_type (expand_env vs v n) v t ->
     wf_env vs ts ->
-    wf_env (cons v vs) (cons t ts)
+    wf_env (expand_env vs v n) (expand_env ts t n)
 
 with val_type : venv -> vl -> ty -> Prop :=
 | v_bool: forall venv b,
     val_type venv (vbool b) TBool
-| v_abs: forall env venv tenv y T1 T2,
+| v_abs: forall env venv tenv y T1 T2 m,
     wf_env venv tenv ->
-    has_type (T1::(TFun T1 T2)::tenv) y T2 ->
-    val_type env (vabs venv y) (TFun T1 T2)
+    has_type (expand_env tenv T1 m) y m T2 ->
+    val_type env (vabs venv y) (TFun T1 m T2)
 .
 
 Inductive stp: venv -> ty -> venv -> ty -> Prop :=
