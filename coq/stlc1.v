@@ -13,9 +13,15 @@ Module STLC.
 
 Definition id := nat.
 
+
+Inductive class : Type :=
+  | First : class
+  | Second : class
+.
+
 Inductive ty : Type :=
   | TBool  : ty
-  | TFun   : ty -> ty -> ty
+  | TFun   : ty -> class -> ty -> ty
 .
 
 Inductive var : Type :=
@@ -29,7 +35,7 @@ Inductive tm : Type :=
   (*| tvar : var -> tm*) 
   | tvar : var -> tm
   | tapp : tm -> tm -> tm (* f(x) *)
-  | tabs : tm -> tm (* \f x.y *)
+  | tabs : class -> tm -> tm (* \f x.y *)
 .
 
 Inductive vl : Type :=
@@ -67,18 +73,6 @@ Definition lookup {X : Type} (n : var) (l : env X) : option X :=
    end
 .
 
-Inductive class : Type :=
-  | First : class
-  | Second : class
-.
-
-Definition get_class (n : var) : class :=
-match n with
-| VFst _ => First
-| VSnd _ => Second
-end
-.
-
 Definition sanitize_env {X : Type} (c : class) (l : env X) : env X :=
    match c with
    | First => match l with
@@ -98,21 +92,21 @@ match l with
 end
 .
 
-Inductive has_type : class -> tenv -> tm -> ty -> Prop :=
+Inductive has_type : tenv -> tm -> class -> ty -> Prop :=
 | t_true: forall n env,
-           has_type n env ttrue TBool
+           has_type env ttrue n TBool
 | t_false: forall n env,
-           has_type n env tfalse TBool
+           has_type env tfalse n TBool
 | t_var: forall n x env T1,
            lookup x (sanitize_env n env) = Some T1 ->
-           has_type n env (tvar x) T1
+           has_type env (tvar x) n T1
 | t_app: forall m n env f x T1 T2,
-           has_type Second env f (TFun T1 T2) ->
-           has_type m env x T1 ->
-           has_type n env (tapp f x) T2
+           has_type env f Second (TFun T1 m T2) ->
+           has_type env x m T1 ->
+           has_type env (tapp f x) n T2
 | t_abs: forall m n env y T1 T2,
-           has_type First (expand_env (sanitize_env n env) T1 m) y T2 ->
-           has_type n env (tabs y) (TFun T1 T2)
+           has_type (expand_env (sanitize_env n env) T1 m) y First T2 ->
+           has_type env (tabs m y) n (TFun T1 m T2)
 .
 
 Inductive wf_env : venv -> tenv -> Prop := 
