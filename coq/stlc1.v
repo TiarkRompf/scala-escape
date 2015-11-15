@@ -177,20 +177,60 @@ Hint Constructors wf_env.
 
 Hint Constructors option.
 Hint Constructors list.
+Hint Constructors env.
 
 Hint Unfold index.
 Hint Unfold length.
+Hint Unfold expand_env.
 
 Hint Resolve ex_intro.
 
+Definition length_env {X : Type} (c : class) (env : env X): nat :=
+match env, c with
+| Def l1 l2 n, First => length l1
+| Def l1 l2 n, Second => length l2
+end
+.
+
+Hint Unfold expand_env.
+
+Lemma length_env_incr : forall (X : Type) n m env (x : X),
+   n = m ->
+   length_env n (expand_env env x m) = 1 + length_env n env.
+Proof.
+  intros. destruct env0; destruct n; inversion H; auto.
+Qed.
+   
+Lemma length_env_same : forall (X : Type) n m env (x : X),
+   n <> m ->
+   length_env n (expand_env env x m) = length_env n env.
+Proof.
+  intros. destruct env0; destruct n; destruct m.
+      apply ex_falso_quodlibet; auto.
+      auto.
+      auto.
+      apply ex_falso_quodlibet; auto.
+Qed.
+
+Hint Rewrite length_env_incr.
+Hint Rewrite length_env_same.
+Hint Unfold not.
+
 Lemma wf_length : forall vs ts,
-                    wf_env vs ts ->
-                    (length vs = length ts).
+      wf_env vs ts ->
+      length_env First vs = length_env First ts /\ length_env Second vs = length_env Second ts.
 Proof.
   intros. induction H. auto.
-  assert ((length (v::vs)) = 1 + length vs). constructor.
-  assert ((length (t::ts)) = 1 + length ts). constructor.
-  rewrite IHwf_env in H1. auto.
+  destruct IHwf_env.
+  destruct n. 
+  Case "First"; split.
+  repeat rewrite length_env_incr; auto.
+  repeat rewrite length_env_same; auto.
+  unfold not; intros. inversion H3. unfold not; intros. inversion H3.
+  Case "Second"; split.
+  repeat rewrite length_env_same; auto.
+  unfold not; intros. inversion H3. unfold not; intros. inversion H3.
+  repeat rewrite length_env_incr; auto.
 Qed.
 
 Hint Immediate wf_length.
