@@ -283,23 +283,33 @@ Proof.
           compute. eauto.
 Qed.
 
-Lemma valtp_extend : forall vs v v1 T,
+Lemma valtp_extend : forall vs v v1 T n,
                        val_type vs v T ->
-                       val_type (v1::vs) v T.
+                       val_type (expand_env vs v1 n) v T.
 Proof. intros. induction H; eauto. Qed.
 
-Lemma index_extend : forall X vs n a (T: X),
-                       index n vs = Some T ->
-                       index n (a::vs) = Some T.
+Lemma index_extend : forall X vs v a (T: X) n,
+                       lookup v vs = Some T ->
+                       lookup v (expand_env vs a n) = Some T.
 
 Proof.
   intros.
-  assert (n < length vs). eapply index_max. eauto.
-  assert (n <> length vs). omega.
-  assert (beq_nat n (length vs) = false) as E. eapply beq_nat_false_iff; eauto.
-  unfold index. unfold index in H. rewrite H. rewrite E. reflexivity.
+  assert (get_idx v < length_env (get_class v) vs). eapply index_max. eauto.
+  assert (get_idx v <> length_env (get_class v) vs). omega.
+  assert (beq_nat (get_idx v) (length_env (get_class v) vs) = false) as E. eapply beq_nat_false_iff; eauto.
+  destruct vs.
+  destruct n.
+  Case "First". destruct v; simpl in E.
+    SCase "VFst". inversion H.
+      unfold expand_env. unfold lookup. unfold index. rewrite E. auto.
+    SCase "VSnd". inversion H.
+      unfold expand_env. unfold lookup. reflexivity.
+  Case "Second". destruct v; simpl in E.
+    SCase "VFst". inversion H.
+      unfold expand_env. unfold lookup. reflexivity.
+    SCase "VSnd". inversion H.
+      unfold expand_env. unfold lookup. unfold index. rewrite E. auto.
 Qed.
-
 
 Lemma index_safe_ex: forall H1 G1 TF i,
              wf_env H1 G1 ->
