@@ -235,23 +235,52 @@ Qed.
 
 Hint Immediate wf_length.
 
-Lemma index_max : forall X vs n (T: X),
-                       index n vs = Some T ->
-                       n < length vs.
+Definition get_class (x : var): class :=
+match x with
+| VFst _ => First
+| VSnd _ => Second
+end
+.
+
+Definition get_idx (x : var): nat :=
+match x with
+| VFst n => n
+| VSnd n => n
+end
+.
+
+Lemma index_max : forall X vs x (T: X),
+                       lookup x vs = Some T ->
+                       get_idx x < length_env (get_class x) vs.
 Proof.
-  intros X vs. induction vs.
-  Case "nil". intros. inversion H.
-  Case "cons".
-  intros. inversion H.
-  case_eq (beq_nat n (length vs)); intros E.
-  SCase "hit".
-  rewrite E in H1. inversion H1. subst.
-  eapply beq_nat_true in E. 
-  unfold length. unfold length in E. rewrite E. eauto.
-  SCase "miss".
-  rewrite E in H1.
-  assert (n < length vs). eapply IHvs. apply H1.
-  compute. eauto.
+  intros X vs; destruct vs as [l1 l2 n].
+  intros x T H.
+  destruct x; simpl.
+  Case "VFst"; induction l1.
+    SCase "nil". intros. inversion H.
+    SCase "cons".
+       intros. inversion H.
+       case_eq (beq_nat i (length l1)); intros E.
+       SSCase "hit".
+          rewrite E in H1. inversion H1. subst.
+          eapply beq_nat_true in E. 
+          unfold length. unfold length in E. rewrite E. eauto.
+       SSCase "miss".
+          rewrite E in H1.
+          assert (i < length l1). eapply IHl1. apply H1.
+          compute. eauto.
+  Case "VSnd"; induction l2.
+    SCase "nil". inversion H. destruct (ble_nat i n); inversion H1.
+    SCase "cons". intros. inversion H.
+       case_eq (beq_nat i (length l2)); intros E.
+       SSCase "hit".
+          rewrite E in H1. inversion H1. subst.
+          eapply beq_nat_true in E. 
+          unfold length. unfold length in E. rewrite E. eauto.
+       SSCase "miss".
+          rewrite E in H1.
+          assert (i < length l2). eapply IHl2. apply H1.
+          compute. eauto.
 Qed.
 
 Lemma valtp_extend : forall vs v v1 T,
