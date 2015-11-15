@@ -182,6 +182,8 @@ Hint Constructors env.
 Hint Unfold index.
 Hint Unfold length.
 Hint Unfold expand_env.
+Hint Unfold lookup.
+Hint Unfold index.
 
 Hint Resolve ex_intro.
 
@@ -249,38 +251,37 @@ match x with
 end
 .
 
-Lemma index_max : forall X vs x (T: X),
+Lemma index_max : forall X vs n (T: X),
+                       index n vs = Some T ->
+                       n < length vs.
+Proof.
+  intros X vs. induction vs.
+  Case "nil". intros. inversion H.
+  Case "cons".
+  intros. inversion H.
+  case_eq (beq_nat n (length vs)); intros E.
+  SCase "hit".
+  rewrite E in H1. inversion H1. subst.
+  eapply beq_nat_true in E. 
+  unfold length. unfold length in E. rewrite E. eauto.
+  SCase "miss".
+  rewrite E in H1.
+  assert (n < length vs). eapply IHvs. apply H1.
+  compute. eauto.
+Qed.
+
+Hint Immediate index_max.
+
+Lemma lookup_max : forall X vs x (T: X),
                        lookup x vs = Some T ->
                        get_idx x < length_env (get_class x) vs.
 Proof.
   intros X vs; destruct vs as [l1 l2 n].
   intros x T H.
   destruct x; simpl.
-  Case "VFst"; induction l1.
-    SCase "nil". intros. inversion H.
-    SCase "cons".
-       intros. inversion H.
-       case_eq (beq_nat i (length l1)); intros E.
-       SSCase "hit".
-          rewrite E in H1. inversion H1. subst.
-          eapply beq_nat_true in E. 
-          unfold length. unfold length in E. rewrite E. eauto.
-       SSCase "miss".
-          rewrite E in H1.
-          assert (i < length l1). eapply IHl1. apply H1.
-          compute. eauto.
-  Case "VSnd"; induction l2.
-    SCase "nil". inversion H. destruct (ble_nat i n); inversion H1.
-    SCase "cons". intros. inversion H.
-       case_eq (beq_nat i (length l2)); intros E.
-       SSCase "hit".
-          rewrite E in H1. inversion H1. subst.
-          eapply beq_nat_true in E. 
-          unfold length. unfold length in E. rewrite E. eauto.
-       SSCase "miss".
-          rewrite E in H1.
-          assert (i < length l2). eapply IHl2. apply H1.
-          compute. eauto.
+  Case "VFst". inversion H; eauto.
+  Case "VSnd". inversion H.
+    destruct (ble_nat i n); inversion H1; eauto.
 Qed.
 
 Lemma valtp_extend : forall vs v v1 T n,
@@ -288,27 +289,32 @@ Lemma valtp_extend : forall vs v v1 T n,
                        val_type (expand_env vs v1 n) v T.
 Proof. intros. induction H; eauto. Qed.
 
-Lemma index_extend : forall X vs v a (T: X) n,
-                       lookup v vs = Some T ->
-                       lookup v (expand_env vs a n) = Some T.
+Lemma index_extend : forall X vs n a (T: X),
+                       index n vs = Some T ->
+                       index n (a::vs) = Some T.
 
 Proof.
   intros.
-  assert (get_idx v < length_env (get_class v) vs). eapply index_max. eauto.
-  assert (get_idx v <> length_env (get_class v) vs). omega.
-  assert (beq_nat (get_idx v) (length_env (get_class v) vs) = false) as E. eapply beq_nat_false_iff; eauto.
+  assert (n < length vs). eapply index_max. eauto.
+  assert (n <> length vs). omega.
+  assert (beq_nat n (length vs) = false) as E. eapply beq_nat_false_iff; eauto.
+  unfold index. unfold index in H. rewrite H. rewrite E. reflexivity.
+Qed.
+
+Hint Immediate index_extend.
+
+Lemma lookup_extend : forall X vs x a (T: X) n,
+                       lookup x vs = Some T ->
+                       lookup x (expand_env vs a n) = Some T.
+
+Proof.
+  intros.
+  assert (get_idx x < length_env (get_class x) vs). eapply lookup_max. eauto.
+  assert (get_idx x <> length_env (get_class x) vs). omega.
+  assert (beq_nat (get_idx x) (length_env (get_class x) vs) = false) as E. eapply beq_nat_false_iff; eauto.
   destruct vs.
-  destruct n.
-  Case "First". destruct v; simpl in E.
-    SCase "VFst". inversion H.
-      unfold expand_env. unfold lookup. unfold index. rewrite E. auto.
-    SCase "VSnd". inversion H.
-      unfold expand_env. unfold lookup. reflexivity.
-  Case "Second". destruct v; simpl in E.
-    SCase "VFst". inversion H.
-      unfold expand_env. unfold lookup. reflexivity.
-    SCase "VSnd". inversion H.
-      unfold expand_env. unfold lookup. unfold index. rewrite E. auto.
+  destruct n; destruct x; simpl in E;
+    inversion H; simpl; try rewrite E; auto.
 Qed.
 
 Lemma index_safe_ex: forall H1 G1 TF i,
