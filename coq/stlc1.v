@@ -110,11 +110,18 @@ Inductive has_type : tenv -> tm -> class -> ty -> Prop :=
            has_type env (tabs m y) n (TFun T1 m T2)
 .
 
+Definition get_inv_idx {X : Type} (env : env X) :=
+match env with
+| Def l1 l2 idx => idx
+end
+.
+
 Inductive wf_env : venv -> tenv -> Prop := 
 | wfe_nil : wf_env (Def vl nil nil O) (Def ty nil nil O) 
 | wfe_cons : forall v t vs ts n,
     val_type (expand_env vs v n) v t ->
     wf_env vs ts ->
+    get_inv_idx vs = get_inv_idx ts ->
     wf_env (expand_env vs v n) (expand_env ts t n)
 
 with val_type : venv -> vl -> ty -> Prop :=
