@@ -404,15 +404,14 @@ Proof.
   intros. inversion H; inversion H0; subst T2; subst; eauto.
 Qed.
 
-
-Lemma invert_abs: forall venv vf vx T1 T2,
-  val_type venv vf (TFun T1 T2) ->
-  exists env tenv y T3 T4,
-    vf = (vabs env y) /\ 
+Lemma invert_abs: forall venv vf vx T1 n T2,
+  val_type venv vf (TFun T1 n T2) ->
+  exists env tenv y m T3 T4,
+    vf = (vabs env n y) /\
     wf_env env tenv /\
-    has_type (T3::(TFun T3 T4)::tenv) y T4 /\
-    stp venv T1 (vx::vf::env) T3 /\
-    stp (vx::vf::env) T4 venv T2.
+    has_type (expand_env (expand_env tenv (TFun T3 m T4) Second) T3 m) y m T4 /\
+    stp venv T1 (expand_env (expand_env env vf Second) vx m) T3 /\
+    stp (expand_env (expand_env env vf Second) vx m) T4 venv T2.
 Proof.
   intros. inversion H. repeat eexists; repeat eauto.
 Qed.
