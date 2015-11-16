@@ -230,15 +230,15 @@ Lemma wf_length : forall vs ts,
       length_env First vs = length_env First ts /\ length_env Second vs = length_env Second ts.
 Proof.
   intros. induction H. auto.
-  destruct IHwf_env.
+  destruct IHwf_env as [L R].
   destruct n. 
   Case "First"; split.
   repeat rewrite length_env_incr; auto.
   repeat rewrite length_env_same; auto.
-  unfold not; intros. inversion H3. unfold not; intros. inversion H3.
+  unfold not; intros. inversion H2. unfold not; intros. inversion H2.
   Case "Second"; split.
   repeat rewrite length_env_same; auto.
-  unfold not; intros. inversion H3. unfold not; intros. inversion H3.
+  unfold not; intros. inversion H2. unfold not; intros. inversion H2.
   repeat rewrite length_env_incr; auto.
 Qed.
 
@@ -323,30 +323,69 @@ Proof.
   destruct n; destruct x; simpl in E;
     inversion H; simpl; try rewrite E; auto.
 Qed.
-
-Lemma index_safe_ex: forall H1 G1 TF i,
-             wf_env H1 G1 ->
-             index i G1 = Some TF ->
-             exists v, index i H1 = Some v /\ val_type H1 v TF.
-Proof. intros. induction H.
-       Case "nil". inversion H0.
-       Case "cons". inversion H0.
-         case_eq (beq_nat i (length ts)).
-           SCase "hit".
-             intros E.
-             rewrite E in H3. inversion H3. subst t.
-             assert (beq_nat i (length vs) = true). eauto.
-             assert (index i (v :: vs) = Some v). eauto.  unfold index. rewrite H2. eauto.
-             eauto.
-           SCase "miss".
-             intros E.
-             assert (beq_nat i (length vs) = false). eauto.
-             rewrite E in H3.
-             assert (exists v0, index i vs = Some v0 /\ val_type vs v0 TF) as HI. eapply IHwf_env. eauto.
-           inversion HI as [v0 HI1]. inversion HI1. 
-           eexists. econstructor. eapply index_extend; eauto. eapply valtp_extend; eauto.
+(*
+Lemma index_safe_ex: forall Hl1 Hl2 Gl1 Gl2 Hidx Gidx TF i,
+   wf_env (Def vl Hl1 Hl2 Hidx) (Def ty Gl1 Gl2 Gidx) ->
+   index i Gl1 = Some TF ->
+   exists v, index i Hl1 = Some v.
+Proof. intros.
+  apply wf_length in H. destruct H as [L _]. simpl in L.
+  
 Qed.
+*)
 
+Lemma lookup_safe_ex: forall H1 G1 TF x,
+             wf_env H1 G1 ->
+             lookup x G1 = Some TF ->
+             exists v, lookup x H1 = Some v /\ val_type H1 v TF.
+Proof. intros. induction H.
+  Case "nil". destruct x; inversion H0.
+    SCase "VSnd"; destruct i; inversion H1.
+   Case "cons". destruct vs as [vl1 vl2 vidx]. destruct ts as [tl1 tl2 tidx].
+    apply wf_length in H1. destruct H1 as [H1l H1r].
+    destruct x; inversion H0.
+    SCase "VFst". destruct n; simpl in H0 ; simpl in H2.
+      SSCase "First".
+        case_eq (beq_nat i (length tl1)).
+        SSSCase "hit".
+          intros E.
+          rewrite E in H0. inversion H0. subst t. simpl.
+          assert (beq_nat i (length vl1) = true). eauto.
+          rewrite H1. eauto.
+        SSSCase "miss".
+          intros E.
+          assert (beq_nat i (length vl1) = false). eauto.
+          assert (exists v0, lookup (VFst i) (Def vl vl1 vl2 vidx) = Some v0 /\ val_type (Def vl vl1 vl2 vidx) v0 TF) as HI.
+          eapply IHwf_env. simpl. rewrite E in H0. eauto.
+          inversion HI as [v0 HI1]. inversion HI1.
+          eexists. econstructor. eapply lookup_extend; eauto. eapply valtp_extend; eauto.
+     SSCase "Second".
+       assert (exists v0, lookup (VFst i) (Def vl vl1 vl2 vidx) = Some v0 /\ val_type (Def vl vl1 vl2 vidx) v0 TF) as HI.
+       eapply IHwf_env. simpl. eauto.
+       inversion HI as [v0 HI1]. inversion HI1.
+       eexists. econstructor. eapply lookup_extend; eauto. eapply valtp_extend; eauto.
+   SCase "VSnd". destruct n; simpl in H0; simpl in H2.
+     SSCase "First".
+       assert (exists v0, lookup (VSnd i) (Def vl vl1 vl2 vidx) = Some v0 /\ val_type (Def vl vl1 vl2 vidx) v0 TF) as HI.
+       eapply IHwf_env. simpl. eauto.
+       inversion HI as [v0 HI1]. inversion HI1.
+       eexists. econstructor. eapply lookup_extend; eauto. eapply valtp_extend; eauto.
+     SSCase "Second".
+       case_eq (beq_nat i (length tl2)).
+        SSSCase "hit".
+          intro E.
+          rewrite E in H0. simpl. destruct (ble_nat i tidx); inversion H0.
+          subst t.
+          assert (beq_nat i (length vl2) = true). eauto.
+          rewrite H1. inversion H3. subst vidx. destruct (ble_nat i tidx); eauto. inversion H5.
+        SSSCase "miss".
+          intro E.
+          assert (beq_nat i (length vl2) = false). eauto.
+          assert (exists v0, lookup (VSnd i) (Def vl vl1 vl2 vidx) = Some v0 /\ val_type (Def vl vl1 vl2 vidx) v0 TF) as HI.
+          eapply IHwf_env. simpl. destruct (ble_nat i tidx). inversion H0. rewrite E in H0. auto.
+          inversion HI as [v0 HI1]. inversion HI1.
+          eexists. econstructor. eapply lookup_extend; eauto. eapply valtp_extend; eauto.
+Qed.
   
 Inductive res_type: venv -> option vl -> ty -> Prop :=
 | not_stuck: forall venv v T,
