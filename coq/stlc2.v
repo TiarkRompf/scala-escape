@@ -86,9 +86,9 @@ Definition sanitize_env {X : Type} (c : class) (l : env X) : env X :=
 end
 .
 *)
-Definition expand_env {X : Type} (l : env X) (x : X) (c : class) : (env X) :=
+Definition expand_env {X : Type} (l : env_stack X) (x : X) (c : class) : (env_stack X) :=
 match l with
-| Def l1 l2 m =>
+| Def l1 l2 =>
    match c with
    | First => Def X (x::l1) l2
    | Second => Def X l1 ([x]::l2)
