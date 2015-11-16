@@ -9,12 +9,12 @@ class RegionSuite extends CompilerTesting {
   @Test def test1 = {
     trait Data[T] { 
 	  def size: Long
-	  def apply(i: Long)(implicit cc: T): Long 
-	  def update(i: Long, x:Long)(implicit cc: T): Unit
+	  def apply(i: Long)(implicit @local cc: T): Long 
+	  def update(i: Long, x:Long)(implicit @local cc: T): Unit
 	}
 	trait Region { 
 	  type Cap
-	  def alloc(n: Long)(implicit c: Cap): Data[Cap] 
+	  def alloc(n: Long)(implicit @local c: Cap): Data[Cap] 
 	}
 
 	abstract class F[B] { def apply(r: Region): r.Cap -> B }
@@ -25,23 +25,22 @@ class RegionSuite extends CompilerTesting {
 	    type Cap = Any
 	    var data = new Array[Long](n.toInt)//malloc(n) 
 	    var p = 0L
-	    def alloc(n: Long)(implicit c: Cap) = new Data[Cap] {
+	    def alloc(n: Long)(implicit @local c: Cap) = new Data[Cap] {
 	      def size = n
 	      val addr = p
 	      p += n
-	      def apply(i: Long)(implicit c: Cap): Long = 
+	      def apply(i: Long)(implicit @local c: Cap): Long = 
 	        data((addr+i).toInt)
-	      def update(i: Long, x:Long)(implicit cc: Cap): Unit = 
+	      def update(i: Long, x:Long)(implicit @local cc: Cap): Unit = 
 	        data((addr+i).toInt) = x
 	    }
 	  }
 	  try f(r)(cap) finally r.data = null //free(r.data)
 	}
-
 	withRegion[Long](100) { r => c0 => 
 	  //for @lcoal[Nothing], succeed
 	  //for @local[Any]/@local, compile error
-	  @local[Nothing] implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
+	  @local implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
 	  val a = r.alloc(3)  // type: Data[r.Cap]
 	  val b = r.alloc(4)
 	  a(0) = 1
