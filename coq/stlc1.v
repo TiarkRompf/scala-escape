@@ -117,7 +117,7 @@ end
 .
 
 Inductive wf_env : venv -> tenv -> Prop := 
-| wfe_nil : wf_env (Def vl nil nil O) (Def ty nil nil O) 
+| wfe_nil : forall idx, wf_env (Def vl nil nil idx) (Def ty nil nil idx) 
 | wfe_cons : forall v t vs ts n,
     val_type (expand_env vs v n) v t ->
     wf_env vs ts ->
@@ -340,7 +340,7 @@ Lemma lookup_safe_ex: forall H1 G1 TF x,
              exists v, lookup x H1 = Some v /\ val_type H1 v TF.
 Proof. intros. induction H.
   Case "nil". destruct x; inversion H0.
-    SCase "VSnd"; destruct i; inversion H1.
+    SCase "VSnd". simpl. destruct (ble_nat i idx); inversion H1.
    Case "cons". destruct vs as [vl1 vl2 vidx]. destruct ts as [tl1 tl2 tidx].
     apply wf_length in H1. destruct H1 as [H1l H1r].
     destruct x; inversion H0.
