@@ -38,19 +38,19 @@ Inductive tm : Type :=
   | tabs : class -> tm -> tm (* \f x.y *)
 .
 
-Inductive env (X: Type) :=
-  | Def : list X -> list X -> nat -> env X.
+Inductive env_stack (X: Type) :=
+  | Def : list X -> list (list X) -> env_stack X.
 
-Inductive vl : Type :=
-| vbool : bool -> vl
-| vabs  : env vl -> class -> tm -> vl
+Inductive vl_stack : Type :=
+| vbool : bool -> vl_stack
+| vabs  : list vl_stack -> option nat -> class -> tm -> vl_stack
 .
 
-Definition venv := env vl.
-Definition tenv := env ty.
+Definition venv_stack := env_stack vl_stack.
+Definition tenv_stack := env_stack ty.
 
-Hint Unfold venv.
-Hint Unfold tenv.
+Hint Unfold venv_stack.
+Hint Unfold tenv_stack.
 
 Fixpoint length {X: Type} (l : list X): nat :=
   match l with
@@ -64,16 +64,19 @@ Fixpoint index {X : Type} (n : id) (l : list X) : option X :=
     | a :: l'  => if beq_nat n (length l') then Some a else index n l'
   end.
 
-Definition lookup {X : Type} (n : var) (l : env X) : option X :=
-  match l with
-    | Def l1 l2 m =>
-         match n with
-           | VFst idx => index idx l1
-           | VSnd idx => if ble_nat idx m then None else index idx l2
-         end
+Definition lookup {X : Type} (n : var) (l : env_stack X) : option X :=
+match l with
+| Def l1 l2 =>
+   match n with
+   | VFst idx => index idx l1
+   | VSnd idx => match l2 with
+                 | [] => None
+                 | h::t => index idx h
+                 end
    end
+end
 .
-
+(*
 Definition sanitize_env {X : Type} (c : class) (l : env X) : env X :=
    match c with
    | First => match l with
@@ -82,13 +85,13 @@ Definition sanitize_env {X : Type} (c : class) (l : env X) : env X :=
    | Second => l
 end
 .
-
+*)
 Definition expand_env {X : Type} (l : env X) (x : X) (c : class) : (env X) :=
 match l with
 | Def l1 l2 m =>
    match c with
-   | First => Def X (x::l1) l2 m
-   | Second => Def X l1 (x::l2) m
+   | First => Def X (x::l1) l2
+   | Second => Def X l1 ([x]::l2)
    end
 end
 .
@@ -99,14 +102,14 @@ Inductive has_type : tenv -> tm -> class -> ty -> Prop :=
 | t_false: forall n env,
            has_type env tfalse n TBool
 | t_var: forall n x env T1,
-           lookup x (sanitize_env n env) = Some T1 ->
+           lookup x env = Some T1 ->
            has_type env (tvar x) n T1
 | t_app: forall m n env f x T1 T2,
            has_type env f Second (TFun T1 m T2) ->
            has_type env x m T1 ->
            has_type env (tapp f x) n T2
 | t_abs: forall m n env y T1 T2,
-           has_type (expand_env (sanitize_env n env) T1 m) y First T2 ->
+           has_type (expand_env env T1 m) y First T2 ->
            has_type env (tabs m y) n (TFun T1 m T2)
 .
 
