@@ -106,7 +106,7 @@ Inductive has_type : tenv -> tm -> class -> ty -> Prop :=
            has_type env x m T1 ->
            has_type env (tapp f x) n T2
 | t_abs: forall m n env y T1 T2,
-           has_type (expand_env (sanitize_env n env) T1 m) y First T2 ->
+           has_type (expand_env (expand_env (sanitize_env n env) (TFun T1 m T2) Second) T1 m) y First T2 ->
            has_type env (tabs m y) n (TFun T1 m T2)
 .
 
@@ -129,7 +129,7 @@ with val_type : venv -> vl -> ty -> Prop :=
     val_type venv (vbool b) TBool
 | v_abs: forall env venv tenv y T1 T2 m,
     wf_env venv tenv ->
-    has_type (expand_env tenv T1 m) y m T2 ->
+    has_type (expand_env (expand_env tenv (TFun T1 m T2) Second) T1 m) y m T2 ->
     val_type env (vabs venv m y) (TFun T1 m T2)
 .
 
@@ -166,7 +166,7 @@ Fixpoint teval(k: nat)(env: venv)(t: tm)(n: class){struct k}: option (option vl)
                   | None => None
                   | Some None => Some None
                   | Some (Some vx) =>
-                       teval k' (expand_env env2 vx m) ey First
+                       teval k' (expand_env (expand_env env2 (vabs env2 m ey) Second) vx m) ey First
                 end
           end
       end
