@@ -117,7 +117,7 @@ end
 .
 
 Inductive wf_env : venv -> tenv -> Prop := 
-| wfe_nil : forall idx, wf_env (Def vl nil nil idx) (Def ty nil nil idx) 
+| wfe_nil : wf_env (Def vl nil nil 0) (Def ty nil nil 0)
 | wfe_cons : forall v t vs ts n,
     val_type (expand_env vs v n) v t ->
     wf_env vs ts ->
@@ -229,7 +229,7 @@ Lemma wf_length : forall vs ts,
       wf_env vs ts ->
       length_env First vs = length_env First ts /\ length_env Second vs = length_env Second ts.
 Proof.
-  intros. induction H. auto.
+  intros. induction H; auto.
   destruct IHwf_env as [L R].
   destruct n. 
   Case "First"; split.
@@ -340,8 +340,8 @@ Lemma lookup_safe_ex: forall H1 G1 TF x,
              exists v, lookup x H1 = Some v /\ val_type H1 v TF.
 Proof. intros. induction H.
   Case "nil". destruct x; inversion H0.
-    SCase "VSnd". simpl. destruct (ble_nat i idx); inversion H1.
-   Case "cons". destruct vs as [vl1 vl2 vidx]. destruct ts as [tl1 tl2 tidx].
+    SCase "VSnd". simpl. destruct i; inversion H1.
+  Case "cons". destruct vs as [vl1 vl2 vidx]. destruct ts as [tl1 tl2 tidx].
     apply wf_length in H1. destruct H1 as [H1l H1r].
     destruct x; inversion H0.
     SCase "VFst". destruct n; simpl in H0 ; simpl in H2.
@@ -406,56 +406,71 @@ Qed.
 
 Lemma invert_abs: forall venv vf vx T1 n T2,
   val_type venv vf (TFun T1 n T2) ->
-  exists env tenv y m T3 T4,
+  exists env tenv y T3 T4,
     vf = (vabs env n y) /\
     wf_env env tenv /\
-    has_type (expand_env (expand_env tenv (TFun T3 m T4) Second) T3 m) y m T4 /\
-    stp venv T1 (expand_env (expand_env env vf Second) vx m) T3 /\
-    stp (expand_env (expand_env env vf Second) vx m) T4 venv T2.
+    has_type (expand_env (expand_env tenv (TFun T3 n T4) Second) T3 n) y n T4 /\
+    stp venv T1 (expand_env (expand_env env vf Second) vx n) T3 /\
+    stp (expand_env (expand_env env vf Second) vx n) T4 venv T2.
 Proof.
   intros. inversion H. repeat eexists; repeat eauto.
 Qed.
 
+Lemma wf_sanitize : forall n venv tenv,
+   wf_env venv tenv ->
+   wf_env (sanitize_env n venv) (sanitize_env n tenv).
+Proof.
+   Admitted.
+
+Hint Immediate wf_sanitize.
+   
+Lemma val_type_sanitize : forall n venv res T,
+    val_type (sanitize_env n venv) res T ->
+    val_type venv res T.
+Proof.
+  Admitted.
 
 (* if not a timeout, then result not stuck and well-typed *)
 
-Theorem full_safety : forall n e tenv venv res T,
-  teval n venv e = Some res -> has_type tenv e T -> wf_env venv tenv ->
+Theorem full_safety : forall k e n tenv venv res T,
+  teval k venv e n = Some res -> has_type tenv e n T -> wf_env venv tenv ->
   res_type venv res T.
 
 Proof.
-  intros n. induction n.
+  intros k. induction k.
   (* 0 *)   intros. inversion H.
-  (* S n *) intros. destruct e; inversion H; inversion H0.
+  (* S n *) intros. destruct e; inversion H; inversion H0. 
   
   Case "True".  eapply not_stuck. eapply v_bool.
   Case "False". eapply not_stuck. eapply v_bool.
 
   Case "Var".
-    destruct (index_safe_ex venv0 tenv0 T i) as [v [I V]]; eauto. 
+    subst.
+    destruct (lookup_safe_ex (sanitize_env n venv0) (sanitize_env n tenv0) T v) as [va [I V]]; eauto. 
 
-    rewrite I. eapply not_stuck. eapply V.
+    rewrite I. eapply not_stuck. eapply val_type_sanitize. eapply V.
 
   Case "App".
-    remember (teval n venv0 e1) as tf.
-    remember (teval n venv0 e2) as tx. 
-    subst T.
+    remember (teval k venv0 e1 Second) as tf.
+    remember (teval k venv0 e2 m) as tx. 
+    subst T. subst n0.
     
-    destruct tx as [rx|]; try solve by inversion.
-    assert (res_type venv0 rx T1) as HRX. SCase "HRX". subst. eapply IHn; eauto.
-    inversion HRX as [? vx]. 
-
-    destruct tf as [rf|]; subst rx; try solve by inversion.  
-    assert (res_type venv0 rf (TFun T1 T2)) as HRF. SCase "HRF". subst. eapply IHn; eauto.
+    destruct tf as [rf|]; try solve by inversion.  
+    assert (res_type venv0 rf (TFun T1 m T2)) as HRF. SCase "HRF". subst. eapply IHk; eauto.
     inversion HRF as [? vf].
 
-    destruct (invert_abs venv0 vf vx T1 T2) as
+    destruct tx as [rx|]; subst rf; try solve by inversion.
+    assert (res_type venv0 rx T1) as HRX. SCase "HRX". subst. eapply IHk; eauto.
+    inversion HRX as [? vx]. 
+
+    destruct (invert_abs venv0 vf vx T1 m T2) as
         [env1 [tenv [y0 [T3 [T4 [EF [WF [HTY [STX STY]]]]]]]]]. eauto.
     (* now we know it's a closure, and we have has_type evidence *)
 
-    assert (res_type (vx::vf::env1) res T4) as HRY.
+    assert (res_type (expand_env (expand_env env1 vf Second) vx m) res T4) as HRY.
       SCase "HRY".
-        subst. eapply IHn. eauto. eauto.
+        subst. destruct env1 as [vl1 vl2 vidx].
+           destruct m. eapply IHk; eauto.
         (* wf_env f x *) econstructor. eapply valtp_widen; eauto.
         (* wf_env f   *) econstructor. eapply v_abs; eauto.
         eauto.
