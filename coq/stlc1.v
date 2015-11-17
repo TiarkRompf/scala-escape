@@ -129,7 +129,7 @@ with val_type : venv -> vl -> ty -> Prop :=
     val_type venv (vbool b) TBool
 | v_abs: forall env venv tenv y T1 T2 m,
     wf_env venv tenv ->
-    has_type (expand_env (expand_env tenv (TFun T1 m T2) Second) T1 m) y m T2 ->
+    has_type (expand_env (expand_env tenv (TFun T1 m T2) Second) T1 m) y First T2 ->
     val_type env (vabs venv m y) (TFun T1 m T2)
 .
 
@@ -257,6 +257,16 @@ match x with
 | VSnd n => n
 end
 .
+
+Lemma wf_idx : forall vs ts,
+      wf_env vs ts ->
+      get_inv_idx vs = get_inv_idx ts.
+Proof.
+  intros. induction H; auto.
+  destruct vs; destruct ts; destruct n; auto.
+Qed.
+
+Hint Immediate wf_idx.
 
 Lemma index_max : forall X vs n (T: X),
                        index n vs = Some T ->
@@ -409,7 +419,7 @@ Lemma invert_abs: forall venv vf vx T1 n T2,
   exists env tenv y T3 T4,
     vf = (vabs env n y) /\
     wf_env env tenv /\
-    has_type (expand_env (expand_env tenv (TFun T3 n T4) Second) T3 n) y n T4 /\
+    has_type (expand_env (expand_env tenv (TFun T3 n T4) Second) T3 n) y First T4 /\
     stp venv T1 (expand_env (expand_env env vf Second) vx n) T3 /\
     stp (expand_env (expand_env env vf Second) vx n) T4 venv T2.
 Proof.
@@ -470,14 +480,17 @@ Proof.
         [env1 [tenv [y0 [T3 [T4 [EF [WF [HTY [STX STY]]]]]]]]]. eauto.
     (* now we know it's a closure, and we have has_type evidence *)
 
-    assert (e = env1). inversion EF; reflexivity. subst env1.
+    inversion EF. subst e. subst y0. clear EF.
+    subst rx.
 
-    assert (res_type (expand_env (expand_env e (vabs e m t) Second) vx m) res T4) as HRY.
+    assert (res_type (expand_env (expand_env env1 (vabs env1 m t) Second) vx m) res T4) as HRY.
         SSSCase "HRY".
-          subst rx.  eapply IHk; eauto. 
+          subst. eapply IHk; eauto.
         (* wf_env f x *) econstructor. eapply valtp_widen; eauto.
         (* wf_env f   *) econstructor. eapply v_abs; eauto.
-        eauto.
+          eauto.
+          apply wf_idx. assumption.
+          apply wf_idx. econstructor. eauto. assumption. apply wf_idx. assumption.
 
     inversion HRY as [? vy].
 
@@ -485,6 +498,7 @@ Proof.
     
   Case "Abs". intros. inversion H. inversion H0.
     eapply not_stuck. eapply v_abs; eauto.
+    eauto.
 Qed.
 
 End STLC.
