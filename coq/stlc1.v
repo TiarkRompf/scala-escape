@@ -452,25 +452,29 @@ Proof.
 
   Case "App".
     remember (teval k venv0 e1 Second) as tf.
-    remember (teval k venv0 e2 m) as tx. 
     subst T. subst n0.
     
-    destruct tf as [rf|]; try solve by inversion.  
+    destruct tf as [rf|]; try solve by inversion.
     assert (res_type venv0 rf (TFun T1 m T2)) as HRF. SCase "HRF". subst. eapply IHk; eauto.
     inversion HRF as [? vf].
 
-    destruct tx as [rx|]; subst rf; try solve by inversion.
+    subst rf. remember vf as rvf. destruct vf; try (subst rvf; solve by inversion).
+    assert (c = m). destruct m; destruct c; try (subst rvf ; solve by inversion); eauto. subst c. subst rvf.
+    remember (teval k venv0 e2 m) as tx.
+
+    destruct tx as [rx|]; try solve by inversion.
     assert (res_type venv0 rx T1) as HRX. SCase "HRX". subst. eapply IHk; eauto.
     inversion HRX as [? vx]. 
 
-    destruct (invert_abs venv0 vf vx T1 m T2) as
+    destruct (invert_abs venv0 (vabs e m t) vx T1 m T2) as
         [env1 [tenv [y0 [T3 [T4 [EF [WF [HTY [STX STY]]]]]]]]]. eauto.
     (* now we know it's a closure, and we have has_type evidence *)
 
-    assert (res_type (expand_env (expand_env env1 vf Second) vx m) res T4) as HRY.
-      SCase "HRY".
-        subst. destruct env1 as [vl1 vl2 vidx].
-           destruct m. eapply IHk; eauto.
+    assert (e = env1). inversion EF; reflexivity. subst env1.
+
+    assert (res_type (expand_env (expand_env e (vabs e m t) Second) vx m) res T4) as HRY.
+        SSSCase "HRY".
+          subst rx.  eapply IHk; eauto. 
         (* wf_env f x *) econstructor. eapply valtp_widen; eauto.
         (* wf_env f   *) econstructor. eapply v_abs; eauto.
         eauto.
