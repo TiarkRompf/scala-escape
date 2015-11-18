@@ -82,7 +82,7 @@ Definition sanitize_any {X : Type} (l : env X) (n:nat): env X :=
 
 Definition sanitize_env {X : Type} (c : class) (l : env X) : env X :=
   match c,l  with
-    | First, Def l1 l2 _ => Def X l1 l2 (length l2)
+    | First, Def _ l2 _ => sanitize_any l (length l2)
     | Second, _ => l
   end.
 
@@ -443,6 +443,12 @@ Proof.
   intros. inversion H; eauto.
 Qed.
 
+Lemma val_type_sanitize : forall env res T n,
+  val_type (sanitize_env n env) res T ->
+  val_type env res T.
+Proof.
+  Admitted.
+
 
 Lemma wf_sanitize_any : forall n venv tenv,
    wf_env venv tenv ->
@@ -461,7 +467,8 @@ Lemma wf_sanitize : forall n venv tenv,
    wf_env (sanitize_env n venv) (sanitize_env n tenv).
 Proof.
   intros. destruct n; unfold sanitize_env. destruct venv0. destruct tenv0.
-  admit.
+  assert (length l0 = length l2). apply wf_length in H; destruct H as [L R]; eauto.
+  rewrite H0. eapply wf_sanitize_any. eauto.
   eauto.
 Qed.
   
