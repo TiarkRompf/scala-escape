@@ -5,6 +5,7 @@ import com.typesafe.sbt.osgi.{OsgiKeys, SbtOsgi}
 // plugin logic of build based on https://github.com/retronym/boxer
 
 lazy val commonSettings = scalaModuleSettings ++ Seq(
+  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0-M5" cross CrossVersion.full),
   repoName                   := "scala-escape",
   organization               := "org.scala-lang.plugins",
   version                    := "1.0.1-SNAPSHOT",
@@ -42,7 +43,10 @@ lazy val library = project settings (scalaModuleOsgiSettings: _*) settings (Mima
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-compiler"  % scalaVersion.value % "test",
     "junit"          % "junit"           % "4.11" % "test",
-    "com.novocode"   % "junit-interface" % "0.10" % "test"),
+    "com.novocode"   % "junit-interface" % "0.10" % "test",
+    //add scala-offheap
+    "sh.den"         % "scala-offheap_2.11" % "0.1"),
+
   testOptions          += Tests.Argument(
     TestFrameworks.JUnit,
     s"-Dscala-escape-plugin.jar=${pluginJar.value.getAbsolutePath}"
