@@ -8,6 +8,7 @@ Require Export SfLib.
 
 Require Export Arith.EqNat.
 Require Export Arith.Le.
+Require Export Arith.Gt.
 
 Module STLC.
 
@@ -38,12 +39,11 @@ Inductive tm : Type :=
   | tabs : class -> tm -> tm (* \f x.y *)
 .
 
-Inductive env_stack (X: Type) :=
-  | Def : list X -> list (list X) -> env_stack X.
+Definition env_stack (X : Type) := list((list X) * nat).
 
 Inductive vl_stack : Type :=
 | vbool : bool -> vl_stack
-| vabs  : list vl_stack -> option nat -> class -> tm -> vl_stack
+| vabs  : env_stack vl_stack -> option nat -> class -> tm -> vl_stack
 .
 
 Definition venv_stack := env_stack vl_stack.
@@ -64,54 +64,14 @@ Fixpoint index {X : Type} (n : id) (l : list X) : option X :=
     | a :: l'  => if beq_nat n (length l') then Some a else index n l'
   end.
 
-Definition lookup {X : Type} (n : var) (l : env_stack X) : option X :=
-match l with
-| Def l1 l2 =>
-   match n with
-   | VFst idx => index idx l1
-   | VSnd idx => match l2 with
-                 | [] => None
-                 | h::t => index idx h
-                 end
-   end
-end
-.
-(*
-Definition sanitize_env {X : Type} (c : class) (l : env X) : env X :=
-   match c with
-   | First => match l with
-                 | Def l1 l2 _ => Def X l1 l2 (length l2)
-                 end
-   | Second => l
-end
-.
-*)
-Definition expand_env {X : Type} (l : env_stack X) (x : X) (c : class) : (env_stack X) :=
-match l with
-| Def l1 l2 =>
-   match c with
-   | First => Def X (x::l1) l2
-   | Second => Def X l1 ([x]::l2)
-   end
-end
-.
+Fixpoint index_stack {X : Type} (n : id) (l : list X) : option X :=
+match l, id with
+| [], _                => None
+| (h, off)::t, VSnd(i) => if bge_nat i off then index (i - off) h else None
+end.
 
-Inductive has_type : tenv -> tm -> class -> ty -> Prop :=
-| t_true: forall n env,
-           has_type env ttrue n TBool
-| t_false: forall n env,
-           has_type env tfalse n TBool
-| t_var: forall n x env T1,
-           lookup x env = Some T1 ->
-           has_type env (tvar x) n T1
-| t_app: forall m n env f x T1 T2,
-           has_type env f Second (TFun T1 m T2) ->
-           has_type env x m T1 ->
-           has_type env (tapp f x) n T2
-| t_abs: forall m n env y T1 T2,
-           has_type (expand_env env T1 m) y First T2 ->
-           has_type env (tabs m y) n (TFun T1 m T2)
-.
+
+(*
 
 Inductive wf_env : venv -> tenv -> Prop := 
 | wfe_nil : wf_env (Def vl nil nil O) (Def ty nil nil O) 
@@ -132,7 +92,7 @@ with val_type : venv -> vl -> ty -> Prop :=
 Inductive stp: venv -> ty -> venv -> ty -> Prop :=
 | stp_refl: forall G1 G2 T,
    stp G1 T G2 T.
-
+*)
 
 
 (*
@@ -142,15 +102,20 @@ Some (Some v))   means result v
 
 Could use do-notation to clean up syntax.
  *)
+(*Definition heap {X : Type} (env: env_stack X) := fst(env).*)
 
-Fixpoint teval(k: nat)(env: venv)(t: tm)(n: class){struct k}: option (option vl) :=
+
+Fixpoint teval(k: nat)(stack: venv_stack)(heap : list vl_stack)(t: tm)(n: class){struct k}: option (option vl) :=
   match k with
     | 0 => None
     | S k' =>
-      match t with
-        | ttrue      => Some (Some (vbool true))
-        | tfalse     => Some (Some (vbool false))
-        | tvar x     => Some (lookup x (sanitize_env n env))
+      match t, n with
+        | ttrue, _              => Some (Some (vbool true))
+        | tfalse, _             => Some (Some (vbool false))
+        | tvar (VFst i), First  => Some (index i heap)
+        | tvar (VSnd i), First  => Some (None)
+        | tvar (VFst i), Second => Some (index i heap)
+        | tvar (VSnd i), Second => Some (index_stack i stack) 
         | tabs m y   => Some (Some (vabs (sanitize_env n env) m y))
         | tapp ef ex   =>
            match teval k' env ef Second with
