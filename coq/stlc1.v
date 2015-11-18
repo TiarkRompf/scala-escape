@@ -447,8 +447,8 @@ Lemma val_type_sanitize : forall env res T n,
   val_type (sanitize_env n env) res T ->
   val_type env res T.
 Proof.
-  Admitted.
-
+  intros. inversion H; eauto.
+Qed.
 
 Lemma wf_sanitize_any : forall n venv tenv,
    wf_env venv tenv ->
