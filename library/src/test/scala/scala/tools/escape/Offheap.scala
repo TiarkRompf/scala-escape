@@ -47,6 +47,7 @@ class MallocSuite extends CompilerTesting {
 	}
 
 	@Test def test99 {
+	  	println("test99:")
 		withRegion[Long](100) { r => c0 => 
 		  //for @lcoal[Nothing], succeed
 		  //for @local[Any]/@local, compile error
@@ -58,6 +59,25 @@ class MallocSuite extends CompilerTesting {
 		  println(a(0))
 		  println(b(1))
 		  -1L
-		}
+		} 
+		println()
+	}
+
+	@Test def test100 {
+	  	println("test100:")
+		var aa: Data[_] = null
+		withRegion[Long](100) { r => c0 => 
+		  //for @lcoal[Nothing], succeed
+		  //for @local[Any]/@local, compile error
+     	  @local implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
+		  val a = r.alloc(3)  // type: Data[r.Cap]
+		  aa = a
+		  a(0) = 1
+		  println(a(0))
+		  -1L
+		} 
+		println("size of data = " + aa.size)
+		println(aa(0))		//error: accessing outside the scope. Couldn't find implicit parameter
+		println()
 	}
 }

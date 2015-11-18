@@ -39,12 +39,13 @@ class RegionSuite extends CompilerTesting {
 	}
 
   @Test def test1 = {
+  	println("test1")
 	withRegion[Long](100) { r => c0 => 
 	  //for @lcoal[Nothing], succeed
 	  //for @local[Any]/@local, compile error
 	  @local implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
 	  val a = r.alloc(3)  // type: Data[r.Cap]
-	  val b = r.alloc(4)  // how to create a variable of this type outside region?
+	  val b = r.alloc(4)  
 	  a(0) = 1
 	  b(1) = 2
 	  println(a(0))
@@ -55,24 +56,19 @@ class RegionSuite extends CompilerTesting {
   }
 
   @Test def test2 = {
-	var a: Option[Data[_]] = None
+  	println("test2")
+	var a: Data[_] = null
   	withRegion[Long](100) { r => c0 => 
 	  @local implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
-	  a = Some(r.alloc(3))  // type: Data[r.Cap]
-	  var ax: Data[r.Cap] = null
-	  a match {
-	  	case Some(b) => println(b.getClass); ax = b.asInstanceOf[Data[r.Cap]]; ax(0) = 1; println(ax(0))
-	  	case None => println("No value")
-	  	case _ =>
-	  }	  
+	  val b = r.alloc(3)  // type: Data[r.Cap]
+	  a = b
+	  b(0) = 1
+	  println(b(0))
 //	  println(a(0))
 	  -1L
 	}
-	a match {
-	  	case Some(b) => println(b.getClass)
-	  	case None => println("No valueg")
-	  	case _ =>
-	} 
+	println("size of data: " + a.size)
+	println(a(0))		//error: accessing outside the scope. Couldn't find implicit parameter
 	println()
   }
 }
