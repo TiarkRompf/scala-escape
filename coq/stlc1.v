@@ -74,14 +74,18 @@ Definition lookup {X : Type} (n : var) (l : env X) : option X :=
    end
 .
 
+
+Definition sanitize_any {X : Type} (l : env X) (n:nat): env X :=
+  match l with
+    | Def l1 l2 _ => Def X l1 l2 n
+  end.
+
 Definition sanitize_env {X : Type} (c : class) (l : env X) : env X :=
-   match c with
-   | First => match l with
-                 | Def l1 l2 _ => Def X l1 l2 (length l2)
-                 end
-   | Second => l
-end
-.
+  match c,l  with
+    | First, Def l1 l2 _ => Def X l1 l2 (length l2)
+    | Second, _ => l
+  end.
+
 
 Definition expand_env {X : Type} (l : env X) (x : X) (c : class) : (env X) :=
 match l with
@@ -117,7 +121,7 @@ end
 .
 
 Inductive wf_env : venv -> tenv -> Prop := 
-| wfe_nil : wf_env (Def vl nil nil 0) (Def ty nil nil 0)
+| wfe_nil : forall n, wf_env (Def vl nil nil n) (Def ty nil nil n)
 | wfe_cons : forall v t vs ts n,
     val_type (expand_env vs v n) v t ->
     wf_env vs ts ->
@@ -349,8 +353,7 @@ Lemma lookup_safe_ex: forall H1 G1 TF x,
              lookup x G1 = Some TF ->
              exists v, lookup x H1 = Some v /\ val_type H1 v TF.
 Proof. intros. induction H.
-  Case "nil". destruct x; inversion H0.
-    SCase "VSnd". simpl. destruct i; inversion H1.
+  Case "nil". inversion H0. destruct x;  destruct (ble_nat i n); inversion H1.
   Case "cons". destruct vs as [vl1 vl2 vidx]. destruct ts as [tl1 tl2 tidx].
     apply wf_length in H1. destruct H1 as [H1l H1r].
     destruct x; inversion H0.
@@ -428,30 +431,40 @@ Qed.
 
 
 Lemma ext_sanitize_commute : forall {T} n venv (v:T) c,
-   expand_env (sanitize_env n venv) v c = sanitize_env n (expand_env venv v c).
+   expand_env (sanitize_any venv n) v c = sanitize_any (expand_env venv v c) n.
 Proof.
-  admit.
+  intros. destruct venv0. destruct c; simpl; eauto. 
+Qed.
+
+Lemma val_type_sanitize_any : forall n venv res T,
+  val_type venv res T ->
+  val_type (sanitize_any venv n) res T.
+Proof.
+  intros. inversion H; eauto.
 Qed.
 
 
-Lemma val_type_sanitize : forall n venv res T,
-    val_type (sanitize_env n venv) res T = val_type venv res T.
+Lemma wf_sanitize_any : forall n venv tenv,
+   wf_env venv tenv ->
+   wf_env (sanitize_any venv n) (sanitize_any tenv n).
 Proof.
-  Admitted.
-
+  intros. induction H.
+  - simpl. eapply wfe_nil.
+  - eapply wfe_cons in IHwf_env.
+    rewrite <-ext_sanitize_commute. rewrite <-ext_sanitize_commute.
+    eauto. eauto. rewrite ext_sanitize_commute.
+    eapply val_type_sanitize_any in H. eauto. eauto.
+Qed.  
 
 Lemma wf_sanitize : forall n venv tenv,
    wf_env venv tenv ->
    wf_env (sanitize_env n venv) (sanitize_env n tenv).
 Proof.
-  intros.
-  induction H.
-  - destruct n; eauto.
-  - eapply wfe_cons in IHwf_env.
-    rewrite <-ext_sanitize_commute. rewrite <-ext_sanitize_commute.
-    eauto. eauto. rewrite ext_sanitize_commute. rewrite val_type_sanitize.
-    eauto. eauto.
+  intros. destruct n; unfold sanitize_env. destruct venv0. destruct tenv0.
+  admit.
+  eauto.
 Qed.
+  
 
 Hint Immediate wf_sanitize.
    
