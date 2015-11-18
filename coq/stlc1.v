@@ -426,19 +426,35 @@ Proof.
   intros. inversion H. repeat eexists; repeat eauto.
 Qed.
 
+
+Lemma ext_sanitize_commute : forall {T} n venv (v:T) c,
+   expand_env (sanitize_env n venv) v c = sanitize_env n (expand_env venv v c).
+Proof.
+  admit.
+Qed.
+
+
+Lemma val_type_sanitize : forall n venv res T,
+    val_type (sanitize_env n venv) res T = val_type venv res T.
+Proof.
+  Admitted.
+
+
 Lemma wf_sanitize : forall n venv tenv,
    wf_env venv tenv ->
    wf_env (sanitize_env n venv) (sanitize_env n tenv).
 Proof.
-   Admitted.
+  intros.
+  induction H.
+  - destruct n; eauto.
+  - eapply wfe_cons in IHwf_env.
+    rewrite <-ext_sanitize_commute. rewrite <-ext_sanitize_commute.
+    eauto. eauto. rewrite ext_sanitize_commute. rewrite val_type_sanitize.
+    eauto. eauto.
+Qed.
 
 Hint Immediate wf_sanitize.
    
-Lemma val_type_sanitize : forall n venv res T,
-    val_type (sanitize_env n venv) res T ->
-    val_type venv res T.
-Proof.
-  Admitted.
 
 (* if not a timeout, then result not stuck and well-typed *)
 
