@@ -140,6 +140,29 @@ Fixpoint teval_stack(k: nat)(env: venv_stack)(t: tm)(n: class){struct k}: option
       end
   end.
 
+Inductive equiv_val : vl -> vl_stack -> Prop :=
+  | equiv_const : forall b b', b = b' -> equiv_val (vbool b) (vbool_stack b')
+  | equiv_abs : forall H1 H2 idx H lS fr t n S, equiv_env (Def vl H1 H2 idx) (H, lS) ->
+                      index fr lS = Some (S ,idx) ->
+                      equiv_val (vabs (Def vl H1 H2 idx) n t) (vabs_stack H (Some fr) n t)
+with equiv_env : venv -> venv_stack -> Prop :=
+  | all : forall var env v env_stack v_stack,
+                    lookup var env = Some v ->
+                    lookup_stack var env_stack = Some v_stack ->
+                    equiv_val v v_stack ->
+                    equiv_env env env_stack
+.
+   
+
+Theorem env_equiv : forall k n t env v env_stack v_stack,
+     equiv_env env env_stack ->
+     teval k env t n = Some (Some v) ->
+     teval_stack k env_stack t n = Some (Some v_stack) ->
+     equiv_val v v_stack.
+Proof.
+  
+     
+
 
 (* TODO: 
 
