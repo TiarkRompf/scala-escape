@@ -15,7 +15,8 @@ Module STLC2.
 
 Definition id := nat.
 
-Definition stack (X : Type) := list((list X) * nat).
+Definition stack_frame (X : Type) := prod (list X) nat.
+Definition stack (X : Type) := list (stack_frame X).
 Definition heap (X : Type) := list X.
 Definition env_stack (X : Type) := prod (heap X) (stack X).
 
@@ -90,23 +91,31 @@ Could use do-notation to clean up syntax.
 
 Definition current_stack_ptr {X : Type} (env : env_stack X) := length (snd env).
 
-Definition push_heap {X : Type} (env : env_stack X) (x : X) (i : option nat) :=
-match env, i with
-| (h, s), Some idx     => match index idx s with
-                          | None => env
-                          | Some v => (x::h, v::s)
-                          end
-| _, _ => env
-end
-.
-
-Definition push_stack {X : Type} (env : env_stack X) (x : X) (i : option nat) :=
-match env, i with
-| (h, s), Some idx     => match index idx s with
+Definition expand_env_stack {X : Type} (env : env_stack X) (x : X) (i : option nat)  (n : class) :=
+match env, i, n with
+| (h, s), Some idx, First  => match index idx s with
+                              | None => env
+                              | Some v => (x::h, v::s)
+                              end
+| (h, s), Some idx, Second => match index idx s with
                           | None => env
                           | Some (l, off) => (h, (x::l, off)::s)
                           end
-| _, _ => env
+| _, _, _ => env
+end
+.
+
+Definition expand_env_stack_frame {X : Type} (env : env_stack X) (x : X) (i : option nat)  (n : class) :=
+match env, i, n with
+| (h, s), Some idx, First  => match index idx s with
+                              | None => ([], ([], 0))
+                              | Some v => (x::h, v)
+                              end
+| (h, s), Some idx, Second => match index idx s with
+                          | None => ([], ([], 0))
+                          | Some (l, off) => (h, (x::l, off))
+                          end
+| _, _, _ => ([], ([], 0))
 end
 .
 
@@ -131,10 +140,7 @@ Fixpoint teval_stack(k: nat)(env: venv_stack)(t: tm)(n: class){struct k}: option
                 match teval_stack k' env ex m with
                   | None => None
                   | Some None => Some None
-                  | Some (Some vx) => match m with
-                       | First  => teval_stack k' (push_heap env vx i) ey First
-                       | Second => teval_stack k' (push_stack env vx i) ey First
-                       end
+                  | Some (Some vx) => teval_stack k' (expand_env_stack env vx i m) ey First
                 end
           end
       end
@@ -142,24 +148,26 @@ Fixpoint teval_stack(k: nat)(env: venv_stack)(t: tm)(n: class){struct k}: option
 
 Inductive equiv_val : vl -> vl_stack -> Prop :=
   | equiv_const : forall b b', b = b' -> equiv_val (vbool b) (vbool_stack b')
-  | equiv_abs : forall H1 H2 idx H lS fr t n S, equiv_env (Def vl H1 H2 idx) (H, lS) ->
+  | equiv_abs : forall H1 H2 idx H lS fr t n S h, equiv_env lS (Def vl H1 H2 idx) (H, (h, idx)) ->
                       index fr lS = Some (S ,idx) ->
                       equiv_val (vabs (Def vl H1 H2 idx) n t) (vabs_stack H (Some fr) n t)
-with equiv_env : venv -> venv_stack -> Prop :=
-  | all : forall var env v env_stack v_stack,
-                    lookup var env = Some v ->
-                    lookup_stack var env_stack = Some v_stack ->
+with equiv_env : stack vl_stack -> venv -> (heap vl_stack * stack_frame vl_stack) -> Prop :=
+  | eqv_nil : forall H2 lS, equiv_env lS (Def vl [] H2 (length H2)) ([], ([], length H2))
+  | eqv_cons : forall v H1 H2 idx v_stack H lS fr n S h,
+                    equiv_env lS (Def vl H1 H2 idx) (H, (h, idx)) ->
                     equiv_val v v_stack ->
-                    equiv_env env env_stack
+                    index fr lS = Some (S ,idx) ->
+                    equiv_env lS (expand_env (Def vl H1 H2 idx) v n) (expand_env_stack_frame (H, lS) v_stack (Some fr) n).
 .
    
 
-Theorem env_equiv : forall k n t env v env_stack v_stack,
+Theorem teval_equiv : forall k n t env v env_stack v_stack,
      equiv_env env env_stack ->
      teval k env t n = Some (Some v) ->
      teval_stack k env_stack t n = Some (Some v_stack) ->
      equiv_val v v_stack.
 Proof.
+   intro k. induction k.
   
      
 
