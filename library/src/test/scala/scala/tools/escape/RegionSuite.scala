@@ -12,7 +12,7 @@ import org.junit.Test
 import org.junit.Assert.assertEquals
 
 class RegionSuite extends CompilerTesting {
-    trait Data[T] { 
+    trait Data[T] { 	
 	  def size: Long
 	  def apply(i: Long)(implicit @local cc: T): Long 
 	  def update(i: Long, x:Long)(implicit @local cc: T): Unit
@@ -60,7 +60,8 @@ class RegionSuite extends CompilerTesting {
 	}
 	println()
   }
-
+}
+/*
   @Test def test2 = {
   	println("test2")
 	var a: Data[_] = null
@@ -77,39 +78,12 @@ class RegionSuite extends CompilerTesting {
 //	println(a(0))		//error: accessing outside the scope. Couldn't find implicit parameter
 	println()
   }  
+*/
 
-  @Test def test3 = {
-	//pass region and Cap outside scope
-	println("test3")
-	var a: Data[_] = null
-	var rr: Region = null
-	var cc: Any = null
-	withRegion[Long](100) { r => c0 => 
-  		@local implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
-//  		cc = c
-  		val b = r.alloc(3)  // type: Data[r.Cap]
-  		a = b
-  		b(0) = 100
-  		println(b(0))
-		rr = r   	//pass region r to outside
-		-1L
-	}
-	println("size of data: " + a.size)
-	val r = rr
-	/*	if we create a new cap, then we'll be able to access data within region
-	object cap
-	@local implicit val c = cap.asInstanceOf[r.Cap]
-	*/
-	/*	if we reuse the cap created within region, it fails to CompilerTesting	*/
-//	val c = cc.asInstanceOf[r.Cap]	//val c = cc also fails
-//	val aa: Data[r.Cap] = r.alloc(3)
-//	aa(0) = 99
-//	println(aa(0))
-	println()
-  }
-}
-
-class OutRegionSuite extends CompilerTesting{
+/*
+	no @local
+*/
+class OutRegionUnsafeSuite extends CompilerTesting{
 	trait Data[T] { 
 	  def size: Long
 	  def apply(i: Long)(implicit cc: T): Long 
@@ -142,9 +116,9 @@ class OutRegionSuite extends CompilerTesting{
 	  try f(r)(cap) finally r.data = null //free(r.data)
 	}
 
-	@Test def test4 = {
+	@Test def test2 = {
 	  	//pass region and Cap outside scope
-	  	println("test4")
+	  	println("test2")
 	  	var a: Data[_] = null
 	  	var rr: Region = null
 	  	withRegion[Long](100) { r => c0 => 
@@ -168,8 +142,8 @@ class OutRegionSuite extends CompilerTesting{
 	  }
 }
 
-class A extends CompilerTesting{
-  @Test def test5 = expectEscErrorOutput(
+class OutRegionSuite extends CompilerTesting{
+  @Test def test3 = expectEscErrorOutput(
 //  	"value c cannot be used as 1st class value @local[Nothing]",
 	"missing parameter type\n"+
 	"missing parameter type\n"+

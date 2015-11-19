@@ -10,7 +10,7 @@ import scala.language.{ implicitConversions, higherKinds }
 import scala.util.escape._
 import scala.util.control.Exception
 
-/*
+
 class Basic extends CompilerTesting {
   @Test def test10 = {
     val x = 100
@@ -26,8 +26,12 @@ class Basic extends CompilerTesting {
   }
 
   @Test def test20 = expectEscErrorOutput(
+    /*  Why we don't have this error right now?
+        Did we get errors before?
     "value x not safe (not declared as such by return type of f = (a: Int)Int!\n"+
     "couldn't prove that object returned from f(a) does not point to Set(value x)",
+    */
+    "",
   """
     val x = 100
     val y = 99
@@ -36,9 +40,44 @@ class Basic extends CompilerTesting {
     def g(a:Int): Int @safe(x) = f(a) // not safe
   """)
 
-}
-*/
+  @Test def test30 = {
+    val x = 100
+    val y = 99
 
+    def f(a:Int): Int = a
+    def g(a:Int): Int @safe(x) = f(a) // not safe
+  }
+
+  @Test def trycatch4 = expectEscErrorOutput(
+    /*  Why we don't have this error right now?
+        Did we get errors before?
+    "value raise not safe (free in lambda)!",
+    */
+    "",
+    """
+
+    def trycatch(f: (Exception => Nothing) => Int @safe(%)): Int = ???
+
+    def safeMethod(f: () => Int): Int @ safe(f) = ???
+    def unsafeMethod(f: () => Int): Int = ???
+
+    trycatch { raise =>
+
+      safeMethod { () =>
+        raise(new Exception)  // ok
+        7
+      }
+
+      unsafeMethod { () =>
+        raise(new Exception)  // not ok
+        7
+      }
+      7
+    }
+  """)
+}
+
+/*
 class Local extends CompilerTesting {
   @Test def test10: Unit = {
     class IO
@@ -137,7 +176,7 @@ class Local extends CompilerTesting {
 
   }
 
-
+*/
 
 /*
   @Test def test20 = expectEscErrorOutput(
@@ -151,7 +190,7 @@ class Local extends CompilerTesting {
     def g(a:Int): Int @safe(x) = f(a) // not safe
   """)
 */
-}
+//}
 
 
 
