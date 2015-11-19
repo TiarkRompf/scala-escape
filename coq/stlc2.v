@@ -8,7 +8,6 @@ Require Export SfLib.
 
 Require Export Arith.EqNat.
 Require Export Arith.Le.
-Require Export Arith.Gt.
 
 Module STLC.
 
@@ -39,11 +38,13 @@ Inductive tm : Type :=
   | tabs : class -> tm -> tm (* \f x.y *)
 .
 
-Definition env_stack (X : Type) := list((list X) * nat).
+Definition stack (X : Type) := list((list X) * nat).
+Definition heap (X : Type) := list X.
+Definition env_stack (X : Type) := prod (heap X) (stack X).
 
 Inductive vl_stack : Type :=
 | vbool : bool -> vl_stack
-| vabs  : env_stack vl_stack -> option nat -> class -> tm -> vl_stack
+| vabs  : heap vl_stack -> option nat -> class -> tm -> vl_stack
 .
 
 Definition venv_stack := env_stack vl_stack.
@@ -64,10 +65,12 @@ Fixpoint index {X : Type} (n : id) (l : list X) : option X :=
     | a :: l'  => if beq_nat n (length l') then Some a else index n l'
   end.
 
-Fixpoint index_stack {X : Type} (n : id) (l : list X) : option X :=
-match l, id with
-| [], _                => None
-| (h, off)::t, VSnd(i) => if bge_nat i off then index (i - off) h else None
+Definition index_heap {X : Type} (n : id) (l : env_stack X) : option X := index n (fst l).
+
+Definition index_stack {X : Type} (n : id) (l : env_stack X) : option X :=
+match l with
+| (_, [])                => None
+| (_, (h, off)::t) => if ble_nat off n then index (n - off) h else None
 end.
 
 
@@ -104,30 +107,54 @@ Could use do-notation to clean up syntax.
  *)
 (*Definition heap {X : Type} (env: env_stack X) := fst(env).*)
 
+Definition current_stack_ptr {X : Type} (env : env_stack X) := length (snd env).
 
-Fixpoint teval(k: nat)(stack: venv_stack)(heap : list vl_stack)(t: tm)(n: class){struct k}: option (option vl) :=
+Definition push_heap {X : Type} (env : env_stack X) (x : X) (i : option nat) :=
+match env, i with
+| (h, s), Some idx     => match index idx s with
+                          | None => env
+                          | Some v => (x::h, v::s)
+                          end
+| _, _ => env
+end
+.
+
+Definition push_stack {X : Type} (env : env_stack X) (x : X) (i : option nat) :=
+match env, i with
+| (h, s), Some idx     => match index idx s with
+                          | None => env
+                          | Some (l, off) => (h, (x::l, off)::s)
+                          end
+| _, _ => env
+end
+.
+
+Fixpoint teval_stack(k: nat)(env: venv_stack)(t: tm)(n: class){struct k}: option (option vl_stack) :=
   match k with
     | 0 => None
     | S k' =>
       match t, n with
         | ttrue, _              => Some (Some (vbool true))
         | tfalse, _             => Some (Some (vbool false))
-        | tvar (VFst i), First  => Some (index i heap)
-        | tvar (VSnd i), First  => Some (None)
-        | tvar (VFst i), Second => Some (index i heap)
-        | tvar (VSnd i), Second => Some (index_stack i stack) 
-        | tabs m y   => Some (Some (vabs (sanitize_env n env) m y))
-        | tapp ef ex   =>
-           match teval k' env ef Second with
+        | tvar (VFst i), First  => Some (index_heap i env)
+        | tvar (VSnd i), First  => Some None
+        | tvar (VFst i), Second => Some (index_heap i env)
+        | tvar (VSnd i), Second => Some (index_stack i env) 
+        | tabs m y, First       => Some (Some (vabs (fst env) None m y))
+        | tabs m y, Second      => Some (Some (vabs (fst env) (Some (current_stack_ptr env)) m y))
+        | tapp ef ex, _   =>
+           match teval_stack k' env ef Second with
              | None => None
              | Some None => Some None
              | Some (Some (vbool _)) => Some None
-             | Some (Some (vabs env2 m ey)) =>
-                match teval k' env ex m with
+             | Some (Some (vabs env2 i m ey)) =>
+                match teval_stack k' env ex m with
                   | None => None
                   | Some None => Some None
-                  | Some (Some vx) =>
-                       teval k' (expand_env env2 vx m) ey First
+                  | Some (Some vx) => match m with
+                       | First  => teval_stack k' (push_heap env vx i) ey First
+                       | Second => teval_stack k' (push_stack env vx i) ey First
+                       end
                 end
           end
       end
