@@ -193,6 +193,8 @@ Hint Unfold length.
 Hint Unfold expand_env.
 Hint Unfold lookup.
 Hint Unfold index.
+Hint Unfold sanitize_env.
+Hint Unfold sanitize_any.
 
 Hint Resolve ex_intro.
 
