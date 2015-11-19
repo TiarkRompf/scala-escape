@@ -9,49 +9,24 @@ Require Export SfLib.
 Require Export Arith.EqNat.
 Require Export Arith.Le.
 
-Module STLC.
+Require Export stlc1.
+
+Module STLC2.
 
 Definition id := nat.
-
-
-Inductive class : Type :=
-  | First : class
-  | Second : class
-.
-
-Inductive ty : Type :=
-  | TBool  : ty
-  | TFun   : ty -> class -> ty -> ty
-.
-
-Inductive var : Type :=
-  | VFst  : id -> var
-  | VSnd  : id -> var
-.
-
-Inductive tm : Type :=
-  | ttrue : tm
-  | tfalse : tm
-  (*| tvar : var -> tm*) 
-  | tvar : var -> tm
-  | tapp : tm -> tm -> tm (* f(x) *)
-  | tabs : class -> tm -> tm (* \f x.y *)
-.
 
 Definition stack (X : Type) := list((list X) * nat).
 Definition heap (X : Type) := list X.
 Definition env_stack (X : Type) := prod (heap X) (stack X).
 
 Inductive vl_stack : Type :=
-| vbool : bool -> vl_stack
-| vabs  : heap vl_stack -> option nat -> class -> tm -> vl_stack
+| vbool_stack : bool -> vl_stack
+| vabs_stack  : heap vl_stack -> option nat -> class -> tm -> vl_stack
 .
 
 Definition venv_stack := env_stack vl_stack.
-Definition tenv_stack := env_stack ty.
 
 Hint Unfold venv_stack.
-Hint Unfold tenv_stack.
 
 Fixpoint length {X: Type} (l : list X): nat :=
   match l with
@@ -73,6 +48,12 @@ match l with
 | (_, (h, off)::t) => if ble_nat off n then index (n - off) h else None
 end.
 
+Definition lookup_stack {X : Type} (n : var) (l : env_stack X) : option X :=
+match n with
+| VFst i => index_heap i l
+| VSnd i => index_stack i l
+end
+.
 
 (*
 
@@ -134,20 +115,19 @@ Fixpoint teval_stack(k: nat)(env: venv_stack)(t: tm)(n: class){struct k}: option
     | 0 => None
     | S k' =>
       match t, n with
-        | ttrue, _              => Some (Some (vbool true))
-        | tfalse, _             => Some (Some (vbool false))
+        | ttrue, _              => Some (Some (vbool_stack true))
+        | tfalse, _             => Some (Some (vbool_stack false))
         | tvar (VFst i), First  => Some (index_heap i env)
         | tvar (VSnd i), First  => Some None
-        | tvar (VFst i), Second => Some (index_heap i env)
-        | tvar (VSnd i), Second => Some (index_stack i env) 
-        | tabs m y, First       => Some (Some (vabs (fst env) None m y))
-        | tabs m y, Second      => Some (Some (vabs (fst env) (Some (current_stack_ptr env)) m y))
+        | tvar i, Second        => Some (lookup_stack i env)
+        | tabs m y, First       => Some (Some (vabs_stack (fst env) None m y))
+        | tabs m y, Second      => Some (Some (vabs_stack (fst env) (Some (current_stack_ptr env)) m y))
         | tapp ef ex, _   =>
            match teval_stack k' env ef Second with
              | None => None
              | Some None => Some None
-             | Some (Some (vbool _)) => Some None
-             | Some (Some (vabs env2 i m ey)) =>
+             | Some (Some (vbool_stack _)) => Some None
+             | Some (Some (vabs_stack env2 i m ey)) =>
                 match teval_stack k' env ex m with
                   | None => None
                   | Some None => Some None
@@ -470,4 +450,4 @@ Proof.
     eapply not_stuck. eapply v_abs; eauto.
 Qed.
 
-End STLC.
+End STLC2.

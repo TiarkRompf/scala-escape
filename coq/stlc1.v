@@ -9,8 +9,6 @@ Require Export SfLib.
 Require Export Arith.EqNat.
 Require Export Arith.Le.
 
-Module STLC.
-
 Definition id := nat.
 
 
@@ -536,5 +534,3 @@ Proof.
     eapply not_stuck. eapply v_abs; eauto.
     eauto.
 Qed.
-
-End STLC.
