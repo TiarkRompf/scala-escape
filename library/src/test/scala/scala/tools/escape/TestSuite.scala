@@ -77,7 +77,7 @@ class Basic extends CompilerTesting {
   """)
 }
 
-/*
+
 class Local extends CompilerTesting {
   @Test def test10: Unit = {
     class IO
@@ -89,7 +89,10 @@ class Local extends CompilerTesting {
 
     foo(x => 2*g(x))
   }
-
+  /**
+    * [error] /Users/AllenWu/Code/scala-escape/library/src/test/scala/scala/tools/escape/TestSuite.scala:99: value io cannot be used inside method foo
+    * [error]     def foo = println("foo")(io)  // fails
+    */
   @Test def test11: Unit = {
     class IO
     def println(s:String)(@local io: IO) = Console.println(s)
@@ -100,7 +103,10 @@ class Local extends CompilerTesting {
 
     @local def bar = println("bar")(io)  // ok
   }
-
+  /**
+    * [error] /Users/AllenWu/Code/scala-escape/library/src/test/scala/scala/tools/escape/TestSuite.scala:110: value io cannot be used inside value $anonfun
+    * [error]     val foo = () => println("foo")  // fails
+    */
   @Test def test12: Unit = {
     class IO
     def println(s:String)(implicit @local io: IO) = Console.println(s)
@@ -115,7 +121,11 @@ class Local extends CompilerTesting {
 
     handler { x => bar(); 2 }
   }
-
+  /**
+    * [error] /Users/AllenWu/Code/scala-escape/library/src/test/scala/scala/tools/escape/TestSuite.scala:126: overriding method foo in class A with method foo in class B:
+    * [error] some @local annotations on arguments have been dropped
+    * [error]       def foo(x: Int): Int = x      
+    */
   @Test def test13: Unit = {
 
     abstract class A {
@@ -138,6 +148,11 @@ class Local extends CompilerTesting {
     val s = ESC.NO(f.getCanonicalPath())
   }
 
+  /**
+    * [error] /Users/AllenWu/Code/scala-escape/library/src/test/scala/scala/tools/escape/TestSuite.scala:174: method println cannot be used inside value $anonfun
+    * [error]     xs.foreach(x => println(x)) // error
+    * [error]             
+    */
   @Test def test15: Unit = {
 
     trait MySeq[A] {
@@ -176,8 +191,6 @@ class Local extends CompilerTesting {
 
   }
 
-*/
-
 /*
   @Test def test20 = expectEscErrorOutput(
     "value x not safe (not declared as such by return type of f = (a: Int)Int!\n"+
@@ -190,11 +203,11 @@ class Local extends CompilerTesting {
     def g(a:Int): Int @safe(x) = f(a) // not safe
   """)
 */
-//}
+}
 
 
 
-/*
+
 class TryCatch extends CompilerTesting {
 
   @Test def trycatch1: Unit = { () =>
@@ -289,4 +302,4 @@ class TryCatch extends CompilerTesting {
   """)
 
 }
-*/
+
