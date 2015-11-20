@@ -222,7 +222,14 @@ Theorem equiv_fc : forall fr lS v v_stack,
   equiv_res (fr::lS) v v_stack -> fc v_stack -> equiv_res lS v v_stack.
 Proof.
   (* idea: if v_stack is first class, it is a bool or a closure without stack frame. *)
-  admit.
+  (* it doesn't need a stack frame *)
+  intros.
+  inversion H0; subst.
+  destruct v0; inversion H; subst; inversion H5; subst; inversion H6; subst.
+  Case "Bool".
+    repeat constructor.
+  Case "VAbs".
+    repeat constructor. destruct o; solve by inversion.
 Qed.
 
 
