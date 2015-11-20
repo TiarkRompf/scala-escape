@@ -105,7 +105,7 @@ Definition get_stack_frame {X : Type} (st : stack X) (idx: option nat) :=
   match idx with
     | None => None
     | Some idx =>  match index idx st with
-                     | None => Some (nil,0)
+                     | None => None (* Some (nil,0) *)
                      | Some s => Some s
                    end
 end.
@@ -187,23 +187,41 @@ Proof.
   Admitted.
  *)
 
+Hint Unfold get_stack_frame.
+
+Lemma equiv_val_st : forall v v_stack fr lS,
+    equiv_val lS v v_stack ->
+    equiv_val (fr::lS) v v_stack.
+Proof.
+  (* Idea new stack frames don't change old values *)
+  Admitted.
+
 Lemma stack_extend : forall lS env env' fr, 
    equiv_env lS env env' ->
    equiv_env (fr::lS) env env'.
 Proof.
-  intros. generalize fr. induction H.
+  intros. induction H.
   constructor.
-Admitted.
+  eapply eqv_cons. eapply IHequiv_env.
+  eapply equiv_val_st. eassumption.
+  assumption.
+Qed.
 
 
-
+(*
 Inductive fc: option (option vl_stack) -> Prop :=
 | fc_abs : forall H n t, fc (Some (Some (vabs_stack H None n t))).
-(* todo: use fc_val *)              
+(* todo: use fc_val *)  
+*)
+
+Inductive fc : option (option vl_stack) -> Prop :=
+| fc_opt : forall v, fc_val v -> fc (Some (Some v))
+.            
 
 Theorem equiv_fc : forall fr lS v v_stack,
   equiv_res (fr::lS) v v_stack -> fc v_stack -> equiv_res lS v v_stack.
 Proof.
+  (* idea: if v_stack is first class, it is a bool or a closure without stack frame. *)
   admit.
 Qed.
 
