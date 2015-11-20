@@ -48,12 +48,12 @@ class RegionMallocSuite extends CompilerTesting {
 
 	@Test def test101 {
 		println("test101:")
-		withRegion[Long](100) { r => c0 => 
+		withRegion[Long](1000) { r => c0 => 
 		  //for @lcoal[Nothing], succeed
 		  //for @local[Any]/@local, compile error
      	  @local implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
-		  val a = r.alloc(3)  // type: Data[r.Cap]
-		  val b = r.alloc(4)  // how to create a variable of this type outside region?
+		  val a = r.alloc(300)  // type: Data[r.Cap]
+		  val b = r.alloc(400)  // how to create a variable of this type outside region?
 		  a(0) = 1
 		  b(1) = 2
 		  println(a(0))
@@ -128,11 +128,11 @@ class OutRegionMallocUnsafeSuite extends CompilerTesting{
 	  	println("test102")
 	  	var a: Data[_] = null
 	  	var rr: Region = null
-	  	withRegion[Long](100) { r => c0 => 
+	  	withRegion[Long](1000) { r => c0 => 
 		  implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
-		  val b = r.alloc(3)  // type: Data[r.Cap]
+		  val b = r.alloc(300)  // type: Data[r.Cap]
 		  a = b
-		  b(0) = 100
+		  b(0) = 1
 		  println(b(0))
   		  rr = r   	//pass region r to outside
 		  -1L
@@ -141,8 +141,8 @@ class OutRegionMallocUnsafeSuite extends CompilerTesting{
 		val r = rr
 		object cap
 		implicit val c = cap.asInstanceOf[r.Cap]
-		val aa: Data[r.Cap] = r.alloc(3)
-		aa(0) = 99
+		val aa: Data[r.Cap] = r.alloc(400)
+		aa(0) = 2
 		println(aa(0))
 //		r.data = null
 		println()
@@ -198,12 +198,12 @@ class OutRegionMallocSuite extends CompilerTesting{
 	var a: Data[_] = null
 	var rr: Region = null
 	var cc: Any = null
-	withRegion[Long](100) { r => c0 => 
+	withRegion[Long](1000) { r => c0 => 
   		@local implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
   		cc = c
-  		val b = r.alloc(3)  // type: Data[r.Cap]
+  		val b = r.alloc(300)  // type: Data[r.Cap]
   		a = b
-  		b(0) = 100
+  		b(0) = 1
   		println(b(0))
 		rr = r   	//pass region r to outside
 		-1L
@@ -216,10 +216,9 @@ class OutRegionMallocSuite extends CompilerTesting{
 	*/
 	/*	if we reuse the cap created within region, it fails to CompilerTesting	*/
 	val c = cc.asInstanceOf[r.Cap]	//val c = cc also fails
-	val aa: Data[r.Cap] = r.alloc(3)
-	aa(0) = 99
+	val aa: Data[r.Cap] = r.alloc(400)
+	aa(0) = 2
 	println(aa(0))
 	println()
 	""")
 }
-
