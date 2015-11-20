@@ -195,16 +195,18 @@ Proof.
   constructor.
 Admitted.
 
-(*
-Lemma equiv_expand : forall lS env env' v v' n idx,
-   
-Proof.
-*)
 
 
 Inductive fc: option (option vl_stack) -> Prop :=
 | fc_abs : forall H n t, fc (Some (Some (vabs_stack H None n t))).
-(* todo: env *)              
+(* todo: use fc_val *)              
+
+Theorem equiv_fc : forall fr lS v v_stack,
+  equiv_res (fr::lS) v v_stack -> fc v_stack -> equiv_res lS v v_stack.
+Proof.
+  admit.
+Qed.
+
 
 Theorem fc_eval : forall k fr lS env_stack t v_stack,
   teval_stack k (fr::lS) env_stack t First = v_stack ->
@@ -213,11 +215,6 @@ Proof.
 admit.
 Qed.
 
-Theorem equiv_fc : forall fr lS v v_stack,
-  equiv_res (fr::lS) v v_stack -> fc v_stack -> equiv_res lS v v_stack.
-Proof.
-  admit.
-Qed.
 
 Theorem teval_equiv : forall k n t env v lS fr env_stack v_stack,
      teval k env t n = v ->
