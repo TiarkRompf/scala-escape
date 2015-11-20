@@ -14,7 +14,7 @@ Require Export stlc1.
 Definition stack_frame (X : Type) := prod (list X) nat.
 Definition stack (X : Type) := list (stack_frame X).
 Definition heap (X : Type) := list X.
-Definition env_stack (X : Type) := prod (heap X) (stack X).
+Definition env_stack (X : Type) := prod (heap X) (stack_frame X).
 
 Inductive vl_stack : Type :=
 | vbool_stack : bool -> vl_stack
@@ -29,8 +29,8 @@ Definition index_heap {X : Type} (n : id) (l : env_stack X) : option X := index 
 
 Definition index_stack {X : Type} (n : id) (l : env_stack X) : option X :=
 match l with
-| (_, [])          => None
-| (_, (h, off)::t) => if ble_nat off n then index (n - off) h else None
+| (_, ([], _))          => None
+| (_, (h, off)) => if ble_nat off n then index (n - off) h else None
 end.
 
 Definition lookup_stack {X : Type} (n : var) (l : env_stack X) : option X :=
@@ -77,29 +77,13 @@ Could use do-notation to clean up syntax.
  *)
 (*Definition heap {X : Type} (env: env_stack X) := fst(env).*)
 
-Definition current_stack_ptr {X : Type} (env : env_stack X) := length (snd env).
-
-Definition expand_env_stack {X : Type} (env : env_stack X) (x : X) (i : option nat)  (n : class) :=
+Definition expand_env_stack {X : Type} (st : stack X) (env : env_stack X) (x : X) (i : option nat)  (n : class) :=
 match env, i, n with
-| (h, s), Some idx, First  => match index idx s with
-                              | None => ([], [])
-                              | Some v => (x::h, v::s)
-                              end
-| (h, s), Some idx, Second => match index idx s with
-                          | None => ([], [])
-                          | Some (l, off) => (h, (x::l, off)::s)
-                          end
-| _, _, _ => ([], [])
-end
-.
-
-Definition expand_env_stack_frame {X : Type} (env : env_stack X) (x : X) (i : option nat)  (n : class) :=
-match env, i, n with
-| (h, s), Some idx, First  => match index idx s with
+| (h, _), Some idx, First  => match index idx st with
                               | None => ([], ([], 0))
                               | Some v => (x::h, v)
                               end
-| (h, s), Some idx, Second => match index idx s with
+| (h, _), Some idx, Second => match index idx st with
                           | None => ([], ([], 0))
                           | Some (l, off) => (h, (x::l, off))
                           end
@@ -107,7 +91,7 @@ match env, i, n with
 end
 .
 
-Fixpoint teval_stack(k: nat)(env: venv_stack)(t: tm)(n: class){struct k}: option (option vl_stack) :=
+Fixpoint teval_stack(k: nat) (st : stack vl_stack)(env: venv_stack)(t: tm)(n: class){struct k}: option (option vl_stack) :=
   match k with
     | 0 => None
     | S k' =>
@@ -118,17 +102,18 @@ Fixpoint teval_stack(k: nat)(env: venv_stack)(t: tm)(n: class){struct k}: option
         | tvar (VSnd i), First  => Some None
         | tvar i, Second        => Some (lookup_stack i env)
         | tabs m y, First       => Some (Some (vabs_stack (fst env) None m y))
-        | tabs m y, Second      => Some (Some (vabs_stack (fst env) (Some (current_stack_ptr env)) m y))
+        | tabs m y, Second      => Some (Some (vabs_stack (fst env) (Some (length st)) m y))
         | tapp ef ex, _   =>
-           match teval_stack k' env ef Second with
+           match teval_stack k' st env ef Second with
              | None => None
              | Some None => Some None
              | Some (Some (vbool_stack _)) => Some None
              | Some (Some (vabs_stack env2 i m ey)) =>
-                match teval_stack k' env ex m with
+                match teval_stack k' st env ex m with
                   | None => None
                   | Some None => Some None
-                  | Some (Some vx) => teval_stack k' (expand_env_stack env vx i m) ey First
+                  | Some (Some vx) => let env' := expand_env_stack st (expand_env_stack st env (vabs_stack env2 i m ey) i m) vx i m in
+                         teval_stack k' st env' ey First
                 end
           end
       end
@@ -140,30 +125,45 @@ Inductive equiv_val : stack vl_stack -> vl -> vl_stack -> Prop :=
                       index i lS = Some (S ,idx) ->
                       equiv_env lS (Def vl H1 H2 idx) (H, (S, idx)) ->
                       equiv_val lS (vabs (Def vl H1 H2 idx) n t) (vabs_stack H (Some i) n t)
-with equiv_env : stack vl_stack -> venv -> (heap vl_stack * stack_frame vl_stack) -> Prop :=
+with equiv_env : stack vl_stack -> venv -> venv_stack -> Prop :=
   | eqv_nil : forall H2 lS, equiv_env lS (Def vl [] H2 (length H2)) ([], ([], length H2))
-  | eqv_cons : forall v H1 H2 idx v_stack H lS i n S,
+  | eqv_cons : forall v H1 H2 idx v_stack H lS i n S env,
                     index i lS = Some (S, idx) ->
                     equiv_env lS (Def vl H1 H2 idx) (H, (S, idx)) ->
                     equiv_val lS v v_stack ->
-                    equiv_env lS (expand_env (Def vl H1 H2 idx) v n) (expand_env_stack_frame (H, lS) v_stack (Some i) n)
+                    env = expand_env_stack lS (H, (S, idx)) v_stack (Some i) n ->
+                    equiv_env lS (expand_env (Def vl H1 H2 idx) v n) env
 .
 
 Hint Constructors equiv_val.
 Hint Constructors equiv_env.
 
-Lemma lookup_lookup_stack_equiv : forall v env idx v_stack h S lS x,
-   equiv_env lS env (h, (S, idx)) ->
+Lemma lookup_equiv : forall v env v_stack env_stack lS x,
+   equiv_env lS env env_stack ->
    lookup x env = Some v ->
-   lookup_stack x (h, lS) = Some v_stack ->
+   lookup_stack x env_stack = Some v_stack ->
    equiv_val lS v v_stack.
 Proof.
   Admitted.
 
-Theorem teval_equiv : forall k n t env v hp lS v_stack stf idx,
-     equiv_env lS env (hp, (stf, idx)) ->
+Lemma stack_extend : forall lS env env' fr, 
+   equiv_env lS env env' ->
+   equiv_env (fr::lS) env env'.
+Proof.
+  intros. generalize fr. induction H.
+  constructor.
+Admitted.
+
+(*
+Lemma equiv_expand : forall lS env env' v v' n idx,
+   
+Proof.
+*)
+
+Theorem teval_equiv : forall k n t env v lS env_stack v_stack,
+     equiv_env lS env env_stack ->
      teval k env t n = Some (Some v) ->
-     teval_stack k (hp, lS) t n = Some (Some v_stack) ->
+     teval_stack k lS env_stack t n = Some (Some v_stack) ->
      equiv_val lS v v_stack.
 Proof.
    intro k. induction k.
@@ -174,7 +174,7 @@ Proof.
       SCase "False". constructor; reflexivity.
     
       - SCase "Var".
-        eapply lookup_lookup_stack_equiv; eauto.
+        eapply lookup_equiv; eauto.
         destruct v0; destruct n; destruct env; try solve by inversion; eauto.
         unfold sanitize_env in H3; eauto.
         destruct v0; destruct n; try solve by inversion; inversion H4; eauto.
@@ -190,20 +190,19 @@ Proof.
         destruct tx as [rx|]; try solve by inversion.
         destruct rx as [vx|]; try solve by inversion.
 
-        remember (teval_stack k (hp, lS) t1 Second) as tf_stack.
+        remember (teval_stack k lS env_stack0 t1 Second) as tf_stack.
         destruct tf_stack as [rf_stack|]; try solve by inversion.
         destruct rf_stack as [vf_stack|]; try solve by inversion.
         destruct vf_stack; try solve by inversion.
 
-        remember (teval_stack k (hp, lS) t2 c0) as tx_stack.
+        remember (teval_stack k lS env_stack0 t2 c0) as tx_stack.
         destruct tx_stack as [rx_stack|]; try solve by inversion.
         destruct rx_stack as [vx_stack|]; try solve by inversion.
-        destruct o; try solve by inversion.
-        destruct c0; try solve by inversion.
-        remember (index n0 lS) as stf'.
-        destruct stf'; try solve by inversion.
-
-        eapply IHk. eauto. eauto.
+        
+        eapply IHk.
+          destruct env.
+        eapply eqv_cons; eauto.
+          ??
         
         
           
