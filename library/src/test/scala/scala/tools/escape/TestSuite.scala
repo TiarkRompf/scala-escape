@@ -10,7 +10,7 @@ import scala.language.{ implicitConversions, higherKinds }
 import scala.util.escape._
 import scala.util.control.Exception
 
-
+/*
 class Basic extends CompilerTesting {
   @Test def test10 = {
     val x = 100
@@ -303,3 +303,4 @@ class TryCatch extends CompilerTesting {
 
 }
 
+*/
