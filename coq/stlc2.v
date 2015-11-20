@@ -44,6 +44,20 @@ Hint Unfold index_heap.
 Hint Unfold index_stack.
 Hint Unfold lookup_stack.
 
+Inductive fc_val : vl_stack -> Prop :=
+| fc_val_const : forall bool, fc_val (vbool_stack bool)
+(*| fc_val_consf : fc_val (vbool false) *)
+| fc_val_closure : forall tm vheap class,
+      fc_env vheap ->
+      fc_val (vabs_stack vheap None class tm)
+
+with fc_env : heap vl_stack -> Prop := (* H, x^1 :v *)
+| heap_nil : fc_env []
+| heap_const : forall v vheap,
+     fc_val v ->
+     fc_env vheap ->
+     fc_env (v::vheap).
+
 (*
 
 Inductive wf_env : venv -> tenv -> Prop := 
