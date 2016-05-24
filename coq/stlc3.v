@@ -105,10 +105,14 @@ Fixpoint teval_stack(k: nat) (st : stack vl_stack)(env: heap vl_stack)(t: tm)(n:
         | tvar i, Second        => Some (lookup_stack i env st)
         | tabs m y, First       => (* Some (Some (vabs_stack env (S0 0) m y)) *)
                                    match st with
-                                   | [] => Some (Some (vabs_stack env (S0 0) m y))
+                                   | [] => Some None
                                    | (fr, idx)::_ => Some (Some (vabs_stack env (S0 (idx + length fr)) m y))
                                    end
-        | tabs m y, Second      => Some (Some (vabs_stack env (Si (length st)) m y))
+        | tabs m y, Second      => match st with
+                                     | [] => Some None
+                                     | _::st1 => 
+                                       Some (Some (vabs_stack env (Si (length st1)) m y))
+                                   end
         | tapp ef ex, _   =>
            match teval_stack k' st env ef Second with
              | None => None
@@ -180,9 +184,9 @@ Proof.
         eauto.
 Qed. 
 
-Lemma index1_equiv : forall H1 H H2 idx fr fr' lS x,
-   equiv_env (fr::lS) (Def vl H1 H2 idx) (H, fr') ->
-   equiv_opt (fr::lS) (index x H1) (index x H).
+Lemma index1_equiv : forall H1 H H2 idx fr' lS x,
+   equiv_env lS (Def vl H1 H2 idx) (H, fr') ->
+   equiv_opt lS (index x H1) (index x H).
 Proof.
   intros.
      remember (Def vl H1 H2 idx) as env.
@@ -196,17 +200,84 @@ Proof.
   eauto.
 Qed.
 
+
+
+Lemma equiv_length2 : forall H l l0 l1 n n0 lS,
+  equiv_env lS (Def vl l l0 n) (H, (l1, n0)) ->
+  length l0 = n0 + length l1.
+Proof.
+  intros. 
+  remember (Def vl l l0 n) as env.
+  remember (H, (l1, n0)) as env_st.
+  generalize dependent H. generalize dependent l. generalize dependent l0.
+  generalize dependent l1. generalize dependent n. generalize dependent n0.
+  induction H0; intros; inversion Heqenv; inversion Heqenv_st; subst; clear Heqenv_st Heqenv.
+  - eauto.
+  - subst. eapply IHequiv_env; eauto. 
+  - subst. assert (length H2 = n0 + length fr). eapply IHequiv_env; eauto.
+    simpl. omega. 
+Qed.
+
+
+Lemma index2_equiv : forall H l l0 l1 n n0 lS,
+  equiv_env lS (Def vl l l0 n) (H, (l1, n0)) ->
+  n = n0 /\ forall i, (n <= i -> equiv_opt lS (index i l0) (index (i - n0) l1)).
+Proof.
+  intros. 
+  remember (Def vl l l0 n) as env.
+  remember (H, (l1, n0)) as env_st.
+  generalize dependent H. generalize dependent l. generalize dependent l0.
+  generalize dependent l1. generalize dependent n. generalize dependent n0.
+  induction H0; intros; inversion Heqenv; inversion Heqenv_st; subst; clear Heqenv_st Heqenv.
+  - (* eqv_nil *)
+    split. eauto. intros. 
+    remember (index i0 l0) as V1.
+    remember (index (i0 - length l0) []) as V2.
+    destruct V1. symmetry in HeqV1. eapply index_max in HeqV1. omega.
+    destruct V2. inversion HeqV2.
+    eapply e_stuck.
+  - (* eqv_cons_fst *)
+    subst. eapply IHequiv_env; eauto.
+  - (* eqv_cons_snd *)
+    subst. split. eauto. intros. 
+    assert (equiv_opt lS (index i H2) (index (i - n0) fr)). eapply IHequiv_env; eauto.
+    case_eq (beq_nat i (length H2)); intros E.
+    + assert (beq_nat (i - n0) (length fr) = true) as E2.
+      { eapply beq_nat_true_iff. eapply equiv_length2 in H0. eapply beq_nat_true_iff in E. omega. } simpl. rewrite E. rewrite E2. eapply e_val; eauto.
+    + assert (beq_nat (i - n0) (length fr) = false) as E2.
+      { eapply beq_nat_false_iff. eapply equiv_length2 in H0. eapply beq_nat_false_iff in E. omega. } simpl. rewrite E. rewrite E2. eapply H1.
+Qed.
+
+
 Lemma lookup2_equiv : forall env H fr lS i,
    equiv_env (fr::lS) env (H, fr) ->
    equiv_opt (fr::lS) (lookup (VSnd i) env) (lookup_stack (VSnd i) H (fr::lS)).
 Proof.
-  Admitted.
+  intros. destruct env. destruct fr. simpl.
+  eapply index2_equiv in H0. destruct H0. subst.   
+  case_eq (ble_nat n0 i); intros E.
+  - eapply H1. eapply ble_nat_true. eauto.
+  - eapply e_stuck. 
+Qed.
 
-(* Lemma index2_equiv : forall H1 H2 idx H fr lS x,
-   equiv_env (fr::lS) (Def vl H1 H2 idx) (H, fr) ->
-   equiv_opt (fr::lS) (index x H2) (index x H).
+Lemma equiv_sanitize : forall H l l0 l1 n n0 lS,
+  equiv_env lS (Def vl l l0 n) (H, (l1, n0)) ->
+  equiv_env lS (Def vl l l0 (n + length l1)) (H, ([], n0 + length l1)).
 Proof.
-  Admitted.*)
+  intros. 
+  remember (Def vl l l0 n) as env.
+  remember (H, (l1, n0)) as env_st.
+  generalize dependent H. generalize dependent l. generalize dependent l0.
+  generalize dependent l1. generalize dependent n. generalize dependent n0.
+  induction H0; intros; inversion Heqenv; inversion Heqenv_st; subst; clear Heqenv_st Heqenv.
+  - simpl. rewrite plus_comm. simpl. econstructor. eauto.
+  - subst. econstructor. eapply IHequiv_env; eauto. eauto.
+  - subst. simpl. 
+    remember (1 + n0) as n1.
+    assert (n0 + S (length fr) = n1 + length fr). omega. 
+    rewrite H.
+    admit. (* FIXME *)
+Qed.
 
 
 Hint Unfold get_stack_frame.
@@ -275,6 +346,7 @@ admit.
 Qed.
 
 
+
 Theorem teval_equiv : forall k n t env v lS fr env_stack v_stack,
      teval k env t n = v ->
      teval_stack k (fr::lS) env_stack t n = v_stack ->
@@ -291,31 +363,24 @@ Proof.
     
       - SCase "Var".
         clear H2; clear H3.
-        destruct env; destruct v0; destruct n; try solve by inversion; simpl.        
-        (* VFst, First *) econstructor. eapply index1_equiv; eauto.
-        (* VFst, Second *) econstructor. eapply index1_equiv; eauto.
-        (* VSnd, First  *) econstructor.
-           case_eq (ble_nat i (length l0)).
+        destruct env; destruct v0; destruct n; try solve by inversion; simpl.
+        + (* VFst, First *) econstructor. eapply index1_equiv; eauto.
+        + (* VFst, Second *) econstructor. eapply index1_equiv; eauto.
+        + (* VSnd, First  *) econstructor.
+           case_eq (ble_nat (length l0) i); intros E. 
+           SSCase "i > length l0".
+               remember (index i l0) as HIV.
+               destruct HIV. symmetry in HeqHIV. apply index_max in HeqHIV.
+               apply ble_nat_true in E. omega.
+               constructor. 
            SSCase "i <= length l0".
                constructor.
-           SSCase "i > length l0".
-               intro E. remember (index i l0) as HIV.
-               destruct HIV. symmetry in HeqHIV. apply index_max in HeqHIV.
-               apply ble_nat_false in E. unfold not in E.
-               assert (i <= length l0). omega. contradiction.
-               constructor.
-         (*VSnd, Second *) econstructor.
-               replace (if ble_nat i n0 then None else index i l0) with (lookup (VSnd i) (Def vl l l0 n0)); eauto.
+        + (*VSnd, Second *) econstructor.
+               replace (if ble_nat n0 i then index i l0 else None) with (lookup (VSnd i) (Def vl l l0 n0)); eauto.
                replace (let (fr0, off) := fr in if ble_nat off i then index (i - off) fr0 else None) with
                     (lookup_stack (VSnd i) env_stack0 (fr::lS)); eauto.
                eapply lookup2_equiv; eauto.
-(*
-        destruct v0; destruct n; destruct env; try solve by inversion; eauto.
-        unfold sanitize_env in H3; eauto.
-        destruct v0; destruct n; try solve by inversion; inversion H4; eauto.     
-        assert (equiv_opt lS (teval (S k) env (tvar v0) n) (teval_stack (S k) lS env_stack0 (tvar v0) n)) as E. 
-        eapply e_res. eapply lookup_equiv; eauto.
-*)       
+
       - SCase "App". (* case result Some *)
         simpl.
         
@@ -345,8 +410,7 @@ Proof.
                             (expand_env (Def vl H4 H5 idx) (vabs (Def vl H4 H5 idx) First t)
                                         Second)
                             (H6, (vabs_stack H6 i First t :: fr0, idx))) as A.
-          econstructor. eauto. eauto. simpl. eauto. eauto.
-          epplay . eapply A. eauto. simpl. eauto.
+          econstructor. eauto. eauto. simpl. eauto. 
           eapply fc_eval. eauto.
         + eapply equiv_fc. eapply IHk. eauto. eauto. eapply stack_extend.
 
@@ -354,12 +418,26 @@ Proof.
                             (expand_env (Def vl H4 H5 idx) (vabs (Def vl H4 H5 idx) Second t)
                                         Second)
                             (H6, (vabs_stack H6 i Second t :: fr0, idx))) as A.
-          eapply eqv_cons. eauto. eauto. simpl. eauto.
-          eapply eqv_cons. eapply A. eauto. simpl. eauto.
-          eapply fc_eval. eauto.
+          econstructor. eauto. eauto. simpl. eauto.
+          eapply fc_eval. eauto. 
+
       - SCase "Abs".
-        admit.
-Qed.     
+        simpl.
+        destruct n.
+        + destruct fr. destruct env. 
+          econstructor. econstructor. simpl.
+          remember H1 as HX. clear HeqHX.
+          eapply index2_equiv in HX. destruct HX. subst. 
+          remember H1 as HX. clear HeqHX.
+          eapply equiv_length2 in HX. rewrite HX. 
+          eapply equiv_abs. simpl. eauto.
+          eapply equiv_sanitize. eauto.
+        + simpl. destruct fr. destruct env. econstructor. econstructor.
+          remember H1 as HX. clear HeqHX.
+          eapply index2_equiv in HX. destruct HX. subst. 
+          eapply equiv_abs. simpl.
+          assert (beq_nat (length lS) (length lS) = true) as A. eapply beq_nat_true_iff. eauto. rewrite A. eauto. eauto. 
+Qed.
 
 
 (* TODO: 

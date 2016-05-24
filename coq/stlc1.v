@@ -67,7 +67,8 @@ Definition lookup {X : Type} (n : var) (l : env X) : option X :=
     | Def l1 l2 m =>
          match n with
            | VFst idx => index idx l1
-           | VSnd idx => if ble_nat idx m then None else index idx l2
+           | VSnd idx => if ble_nat m idx then index idx l2 else None
+           (* was: if ble_nat idx m then None else index idx l2 *)
          end
    end
 .
@@ -302,7 +303,7 @@ Proof.
   destruct x; simpl.
   Case "VFst". inversion H; eauto.
   Case "VSnd". inversion H.
-    destruct (ble_nat i n); inversion H1; eauto.
+    destruct (ble_nat n i); inversion H1; eauto.
 Qed.
 
 Lemma valtp_extend : forall vs v v1 T n,
@@ -353,7 +354,7 @@ Lemma lookup_safe_ex: forall H1 G1 TF x,
              lookup x G1 = Some TF ->
              exists v, lookup x H1 = Some v /\ val_type H1 v TF.
 Proof. intros. induction H.
-  Case "nil". inversion H0. destruct x;  destruct (ble_nat i n); inversion H1.
+  Case "nil". inversion H0. destruct x;  destruct (ble_nat n i); inversion H1.
   Case "cons". destruct vs as [vl1 vl2 vidx]. destruct ts as [tl1 tl2 tidx].
     apply wf_length in H1. destruct H1 as [H1l H1r].
     destruct x; inversion H0.
@@ -387,15 +388,15 @@ Proof. intros. induction H.
        case_eq (beq_nat i (length tl2)).
         SSSCase "hit".
           intro E.
-          rewrite E in H0. simpl. destruct (ble_nat i tidx); inversion H0.
+          rewrite E in H0. simpl. destruct (ble_nat tidx i); inversion H0.
           subst t.
           assert (beq_nat i (length vl2) = true). eauto.
-          rewrite H1. inversion H3. subst vidx. destruct (ble_nat i tidx); eauto. inversion H5.
+          rewrite H1. inversion H3. subst vidx. destruct (ble_nat tidx i); eauto. inversion H5.
         SSSCase "miss".
           intro E.
           assert (beq_nat i (length vl2) = false). eauto.
           assert (exists v0, lookup (VSnd i) (Def vl vl1 vl2 vidx) = Some v0 /\ val_type (Def vl vl1 vl2 vidx) v0 TF) as HI.
-          eapply IHwf_env. simpl. destruct (ble_nat i tidx). inversion H0. rewrite E in H0. auto.
+          eapply IHwf_env. simpl. destruct (ble_nat tidx i). inversion H0. rewrite E in H0. rewrite H0. rewrite E. auto. auto.
           inversion HI as [v0 HI1]. inversion HI1.
           eexists. econstructor. eapply lookup_extend; eauto. eapply valtp_extend; eauto.
 Qed.

@@ -132,6 +132,26 @@ Theorem ble_nat_false : forall n m,
 (* An exercise in Logic.v *)
 Admitted.
 
+Lemma ble_nat_true_iff : forall n m : nat,
+  ble_nat n m = true <-> n <= m.
+Proof.
+  intros n m. split. apply ble_nat_true.
+  generalize dependent m. induction n; intros m H. reflexivity.
+    simpl. destruct m. inversion H.
+    apply le_S_n in H. apply IHn. assumption.
+Qed.
+
+Lemma ble_nat_false_iff : forall n m : nat,
+  ble_nat n m = false <-> ~(n <= m).
+Proof.
+  intros n m. split. apply ble_nat_false.
+  generalize dependent m. induction n; intros m H.
+    apply ex_falso_quodlibet. apply H. apply le_0_n.
+    simpl. destruct m. reflexivity.
+    apply IHn. intro Hc. apply H. apply le_n_S. assumption.
+Qed.
+
+
 Inductive appears_in (n : nat) : list nat -> Prop :=
 | ai_here : forall l, appears_in n (n::l)
 | ai_later : forall m l, appears_in n l -> appears_in n (m::l).
