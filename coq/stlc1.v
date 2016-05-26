@@ -50,11 +50,11 @@ Definition tenv := env ty.
 Hint Unfold venv.
 Hint Unfold tenv.
 
-Fixpoint length {X: Type} (l : list X): nat :=
+(* Fixpoint length {X: Type} (l : list X): nat :=
   match l with
     | [] => 0
     | _::l' => 1 + length l'
-  end.
+  end.*)
 
 Fixpoint index {X : Type} (n : id) (l : list X) : option X :=
   match l with
