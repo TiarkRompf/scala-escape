@@ -55,19 +55,27 @@ Hint Unfold index_heap.
 Hint Unfold index_stack.
 Hint Unfold lookup_stack.
 
-Inductive fc_val : vl_stack -> Prop :=
-| fc_val_const : forall bool, fc_val (vbool_stack bool)
-| fc_val_closure : forall tm vheap class idx,
+Inductive wf_val : class -> vl_stack -> Prop :=
+| wf_val_const : forall bool c, wf_val c (vbool_stack bool)
+| wf_val_closureF : forall tm vheap class idx,
       fc_env vheap ->
-      fc_val (vabs_stack vheap (S0 idx) class tm)
-
+      wf_val First (vabs_stack vheap (S0 idx) class tm)
+| wf_val_closureS : forall tm vheap class i,
+      fc_env vheap ->
+      wf_val Second (vabs_stack vheap i class tm)
 with fc_env : heap vl_stack -> Prop := (* H, x^1 :v *)
 | heap_nil : fc_env []
 | heap_const : forall v vheap,
-     fc_val v ->
+     wf_val First v ->
      fc_env vheap ->
-     fc_env (v::vheap).
-
+     fc_env (v::vheap)
+with sc_env : stack vl_stack -> Prop :=
+| stack_nil : sc_env []
+| stack_cons : forall vstack fr idx,
+     sc_env vstack ->
+     Forall(fun v => wf_val Second v) fr ->
+     sc_env ((fr, idx)::vstack)
+.
 (*
 None             means timeout
 Some None        means stuck
@@ -288,12 +296,12 @@ Proof.
     econstructor; eauto.
      Admitted. 
 
-Inductive fc : option (option vl_stack) -> Prop :=
-| fc_opt : forall v, fc_val v -> fc (Some (Some v))
+Inductive wf : class -> option (option vl_stack) -> Prop :=
+| wf_opt : forall v c, wf_val c v -> wf c (Some (Some v))
 .            
 
 Theorem equiv_fc : forall fr lS v v_stack,
-  equiv_res (fr::lS) v v_stack -> fc v_stack -> equiv_res lS v v_stack.
+  equiv_res (fr::lS) v v_stack -> wf First v_stack -> equiv_res lS v v_stack.
 Proof.
   (* idea: if v_stack is first class, it is a bool or a closure without stack frame. *)
   (* it doesn't need a stack frame *)
@@ -310,7 +318,7 @@ Proof.
 Lemma index_fc: forall H x v,
    fc_env H ->
    index x H = Some v ->
-   fc_val v.
+   wf_val First v.
 Proof.
    intros.
    induction H0.
@@ -320,22 +328,80 @@ Proof.
      + rewrite E in H1. eauto.
 Qed.
 
+Lemma lookup_snd : forall H lS x v,
+   fc_env H -> sc_env lS ->
+   lookup_stack x H lS = Some v ->
+   wf_val Second v.
+Proof.
+   intros.
+   destruct v; destruct x; try solve by inversion.
+   constructor.
+   constructor.
+   constructor. assert (wf_val First (vabs_stack h s c t)). eapply index_fc; eauto.
+       inversion H3; eauto.
+   induction H1.
+      - inversion H2.
+      - case_eq (ble_nat idx i); intros E; simpl in H2.
+        + rewrite E in H2. induction H3. inversion H2.
+        case_eq (beq_nat (i - idx) (length l)); intros E2; simpl in H2.
+          * rewrite E2 in H2. inversion H2; subst; eauto.
+          * rewrite E2 in H2. apply IHForall. simpl. eauto.
+        + rewrite E in H2. inversion H2.
+Qed.
+
+Lemma fst_any : forall v c,
+  wf First v -> wf c v.
+Proof.
+  intros.
+  destruct c; eauto.
+  repeat (destruct v as [v|]; try solve by inversion); repeat constructor.
+  inversion H; subst.
+  inversion H2; eauto.
+Qed.
+
+Lemma sc_frame : forall fr idx lS i,
+  sc_env lS ->
+  get_stack_frame lS i = Some (fr, idx) ->
+  Forall(fun v => wf_val Second v) fr.
+Proof.
+  intros fr idx lS i H.
+  generalize dependent fr. generalize dependent i.
+  induction H; intros.
+  - destruct i; inversion H. constructor.
+  - destruct i; inversion H1; subst.
+     + constructor.
+     + case_eq (beq_nat n (length vstack)); intros E.
+       * rewrite E in H3. inversion H3; subst. assumption.
+       * rewrite E in H3. apply IHsc_env with (i := Si n). simpl. assumption.
+Qed.
+
+Lemma sc_extend_frame : forall fr idx lS i,
+  sc_env lS ->
+  get_stack_frame lS i = Some (fr, idx) ->
+  sc_env ((fr,idx)::lS).
+Proof.
+  intros.
+  constructor.
+    assumption.
+    eapply sc_frame. eassumption. eassumption.
+Qed.
+
 Definition get_fenv (vs : option (option vl_stack)) :=
   match vs with
   | Some (Some (vabs_stack h _ _ _)) => h
   | _ => []
   end.
 
-Theorem fc_eval : forall k fr lS env_stack t v_stack,
-  teval_stack k (fr::lS) env_stack t First = v_stack ->
-  fc_env env_stack ->
-  fc v_stack.
+Theorem fc_eval : forall k fr lS env_stack t v_stack c,
+  teval_stack k (fr::lS) env_stack t c = v_stack ->
+  fc_env env_stack -> sc_env (fr::lS) ->
+  wf c v_stack.
 Proof.
   intros.
   destruct v_stack as [v_stack|].
   destruct v_stack as [v_stack|].
   generalize dependent fr. generalize dependent lS. generalize dependent env_stack0.
-  generalize dependent t. generalize dependent v_stack.
+  generalize dependent t. generalize dependent v_stack. generalize dependent c.
   induction k; intros.
   Case "k = 0". inversion H.
   Case "k = S k". destruct t;[SCase "True"|SCase "False"|SCase "Var"|SCase "App"|SCase "Abs"]; inversion H; subst.
@@ -343,42 +409,68 @@ Proof.
      SCase "True". constructor. constructor.
      SCase "False". constructor. constructor.
    
-     - SCase "Var". destruct v; try solve by inversion.
-       rewrite H2. constructor. eapply index_fc. eassumption. inversion H2. eauto.
-  
+     - SCase "Var". destruct v; destruct c; try solve by inversion.
+       + rewrite H3. constructor. eapply index_fc. eassumption. inversion H3. eauto.
+       + rewrite H3. constructor. apply (lookup_snd env_stack0 (fr::lS) (VFst i) v_stack); inversion H3; eauto.
+       + rewrite H3. constructor. apply (lookup_snd env_stack0 (fr::lS) (VSnd i) v_stack); inversion H3; eauto.
+
+ 
      - SCase "App".
        
-       remember (fr::lS) as lS1.
-       remember (teval_stack k lS1 env_stack0 t1 Second) as tf_stack.
+       remember (teval_stack k (fr::lS) env_stack0 t1 Second) as tf_stack.
 
        destruct tf_stack as [tf_stack|]; try solve by inversion.
        destruct tf_stack as [tf_stack|]; try solve by inversion.
        destruct tf_stack; try solve by inversion.
  
-       remember (teval_stack k lS1 env_stack0 t2 c) as tx_stack.
+       remember (teval_stack k (fr::lS) env_stack0 t2 c0) as tx_stack.
        
        destruct tx_stack as [tx_stack|]; try solve by inversion.
        destruct tx_stack as [tx_stack|]; try solve by inversion.
 
-       remember (get_stack_frame lS1 s) as frame.
+       remember (get_stack_frame (fr::lS) s) as frame.
        
        destruct frame; try solve by inversion. destruct p.
-       destruct c; simpl in H2. simpl.
 
-       destruct s.
-       
-       eapply IHk with (env_stack0 := (vbool_stack b :: h)).
-       econstructor. eapply IHk; eauto. rewrite Heqtx_stack. subst lS1. eauto.
+       destruct c0; simpl in H3; simpl.
+       * SSCase "abs arg is First".
+          rewrite H3. apply fst_any. 
+          assert (wf First (Some (Some tx_stack))) as FTX. { eapply IHk; eauto. }
+          assert (wf Second (Some (Some (vabs_stack h s First t)))) as SFX. { eapply IHk; eauto. }
 
-       
- 
-       
+          inversion FTX; inversion SFX as [a b SFXV]; inversion SFXV; subst.
+
+          eapply IHk with (env_stack0 := (tx_stack :: h)).
+            constructor; eauto.
+            eapply H3.
+            constructor; eauto. constructor. constructor. eauto.
+              eapply sc_frame. eapply H1. eauto.
+      * SSCase "abs arg is Second".
+          rewrite H3. apply fst_any.
+          assert (wf Second (Some (Some tx_stack))) as FTX. { eapply IHk; eauto. }
+          assert (wf Second (Some (Some (vabs_stack h s Second t)))) as SFX. { eapply IHk; eauto. }
+
+          inversion FTX; inversion SFX as [a b SFXV]; inversion SFXV; subst.
+
+          eapply IHk with (env_stack0 := h); eauto.
+            constructor; eauto. constructor.  assumption.
+              constructor. eauto.
+              eapply sc_frame. eapply H1. eauto.
+
+    - SCase "Abs".
+      destruct c.
+      * destruct fr. constructor. constructor. eauto.
+      * constructor. constructor. eauto.
+  - admit.
+  - admit.
+Qed.       
 
 Theorem teval_equiv : forall k n t env v lS fr env_stack v_stack,
      teval k env t n = v ->
      teval_stack k (fr::lS) env_stack t n = v_stack ->
      
      equiv_env (fr::lS) env (env_stack,fr) ->
+     fc_env env_stack -> sc_env (fr::lS) ->
      equiv_res (fr::lS) v v_stack.
 Proof.
    intro k. induction k.
@@ -418,8 +510,8 @@ Proof.
 
         assert (equiv_res lS1 tf tf_stack) as EF. subst lS1. eapply IHk; eauto.
         destruct EF. econstructor.
-        destruct H4. econstructor. econstructor. 
-        destruct H4. econstructor. econstructor.
+        destruct H6. econstructor. econstructor. 
+        destruct H6. econstructor. econstructor.
         
         remember (teval k env t2 n0) as tx.
         remember (teval_stack k lS0 env_stack0 t2 n0) as tx_stack.
@@ -427,21 +519,35 @@ Proof.
         assert (equiv_res lS0 tx tx_stack) as EX. subst lS0. eapply IHk; eauto.
 
         destruct EX. econstructor.
-        destruct H9. econstructor. econstructor.
+        destruct H11. econstructor. econstructor.
 
-        rewrite H7. unfold expand_env_stack.
+        rewrite H9. unfold expand_env_stack.
        
         destruct n0. 
-        + eapply equiv_fc. eapply IHk. eauto. eauto. eapply stack_extend. simpl.
-          inversion H8; subst idx; subst H5.
-          eapply (eqv_forall lS0 (v0 ::H4) (v_stack0::H6) (vabs (Def vl H4 (H11 ++ H20) (length H20)) First t :: H11)
-                  (vabs_stack H6 i First t :: fr0) H20); eauto.
-          eapply fc_eval. eauto.
-        + eapply equiv_fc. eapply IHk. eauto. eauto. eapply stack_extend.
-          inversion H8; subst idx; subst H5. simpl.
-          eapply (eqv_forall lS0 H4 H6 (v0 :: vabs (Def vl H4 (H11 ++ H20) (length H20)) Second t :: H11)
-                  (v_stack0 :: vabs_stack H6 i Second t :: fr0) H20); eauto.
-          eapply fc_eval. eauto. 
+        + assert (wf Second (Some (Some (vabs_stack H8 i First t)))). { subst lS0. eapply fc_eval; eauto. }
+          assert (wf First (Some (Some  v_stack0))). { subst lS0. eapply fc_eval; eauto. }
+          assert (fc_env ((v_stack0 :: H8))). { inversion H12 as [a b H12val]; inversion H13; inversion H12val; subst. constructor; eauto. }
+          assert (sc_env ((vabs_stack H8 i First t :: fr0, idx) :: lS0)). 
+            { constructor. subst lS0; eauto. constructor. inversion H12; eauto. eapply sc_frame; eauto. }
+          eapply equiv_fc;eauto. eapply IHk; eauto. eapply stack_extend. simpl.
+          inversion H10; subst idx; subst H7.
+          
+          eapply (eqv_forall lS0 (v0 ::H6) (v_stack0::H8) (vabs (Def vl H6 (H17 ++ H20) (length H20)) First t :: H17)
+                  (vabs_stack H8 i First t :: fr0) H20); eauto.
+          
+          eapply fc_eval; eauto.
+        + assert (wf Second (Some (Some (vabs_stack H8 i Second t)))). { subst lS0. eapply fc_eval; eauto. }
+          assert (wf Second (Some (Some  v_stack0))). { subst lS0. eapply fc_eval; eauto. }
+          assert (fc_env H8). { inversion H12; subst. inversion H16. eauto. }
+          assert (sc_env ((v_stack0 :: vabs_stack H8 i Second t :: fr0, idx) :: lS0)). 
+            { constructor. subst lS0; eauto. constructor. inversion H12; eauto. inversion H13; eauto.
+              constructor. inversion H12; eauto. eapply sc_frame; eauto. }
+
+          eapply equiv_fc. eapply IHk; eauto. eapply stack_extend.
+          inversion H10; subst idx; subst H7. simpl.
+          eapply (eqv_forall lS0 H6 H8 (v0 :: vabs (Def vl H6 (H17 ++ H20) (length H20)) Second t :: H17)
+                  (v_stack0 :: vabs_stack H8 i Second t :: fr0) H20); eauto.
+          eapply fc_eval; eauto. 
 
       - SCase "Abs".
         simpl.
