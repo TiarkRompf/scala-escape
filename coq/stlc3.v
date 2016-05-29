@@ -143,9 +143,9 @@ Fixpoint teval_stack(k: nat) (st : stack vl_stack)(env: heap vl_stack)(t: tm)(n:
   end.
 
 Inductive equiv_val : stack vl_stack -> vl -> vl_stack -> Prop :=
-  | equiv_const : forall b b' st, b = b' -> equiv_val st (vbool b) (vbool_stack b')
-  | equiv_abs : forall H1 H2 idx H lS i t n fr,
-                      get_stack_frame lS i = Some (fr ,idx) ->
+  | equiv_const : forall b st, equiv_val st (vbool b) (vbool_stack b)
+  | equiv_abs : forall H1 H2 idx lS i t n H fr,
+                      get_stack_frame lS i = Some (fr, idx) ->
                       equiv_env lS (Def vl H1 H2 idx) (H, (fr, idx)) ->
                       equiv_val lS (vabs (Def vl H1 H2 idx) n t) (vabs_stack H i n t)
 with equiv_env : stack vl_stack -> venv -> venv_stack -> Prop :=
@@ -373,17 +373,6 @@ Proof.
      + case_eq (beq_nat n (length vstack)); intros E.
        * rewrite E in H3. inversion H3; subst. assumption.
        * rewrite E in H3. apply IHsc_env with (i := Si n). simpl. assumption.
-Qed.
-
-Lemma sc_extend_frame : forall fr idx lS i,
-  sc_env lS ->
-  get_stack_frame lS i = Some (fr, idx) ->
-  sc_env ((fr,idx)::lS).
-Proof.
-  intros.
-  constructor.
-    assumption.
-    eapply sc_frame. eassumption. eassumption.
 Qed.
 
 Definition get_fenv (vs : option (option vl_stack)) :=
