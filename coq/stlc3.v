@@ -313,7 +313,17 @@ Proof.
   Case "VAbs".
     repeat constructor. destruct s; try solve by inversion.
     simpl in H11. inversion H11; subst.
-    Admitted.
+    econstructor. simpl. eauto.
+    inversion H14. subst. 
+    inversion H1. subst. 
+    assert (Forall (fun v => wf_val First v) h).
+    admit. (* from H4: fc_env h *)
+    assert (Forall2 (fun (v : vl) (vs : vl_stack) => equiv_val lS v vs) H2 h).
+    admit. (* by induction on H9 *)
+    assert (H5 = []). destruct H5. eauto. inversion H15. subst H5. 
+
+    econstructor. eauto. eauto. 
+Qed.
 
 Lemma index_fc: forall H x v,
    fc_env H ->
