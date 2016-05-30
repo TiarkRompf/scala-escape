@@ -199,13 +199,6 @@ match e in (equiv_val s0 v1 v2) return (Pv s0 v1 v2) with
          end)
 end.
 
-
-
-
-
-
-
-
 Inductive equiv_opt: stack vl_stack -> option (vl) -> option (vl_stack) -> Prop :=
 | e_stuck : forall lS, equiv_opt lS None None
 | e_val : forall lS v v_stack, equiv_val lS v v_stack -> equiv_opt lS (Some v) ((Some v_stack)).
@@ -342,7 +335,8 @@ Proof.
 
   - intros. constructor.
   - intros. econstructor. destruct i. simpl. eauto. simpl. eauto. simpl in H3.
-    assert (beq_nat n0 (length lS0) = false). admit. (* from index_max *)
+    assert (beq_nat n0 (length lS0) = false).
+     { apply index_max in H3. apply beq_nat_false_iff. intro contra. subst. eapply lt_irrefl. eauto. }
     rewrite H5. eauto. eauto.
   - intros. constructor; eauto.
   - eauto.
@@ -352,10 +346,11 @@ Lemma stack_extend : forall lS env env' fr,
    equiv_env lS env env' ->
    equiv_env (fr::lS) env env'.
 Proof.
-  intros.
-  inversion H; subst.
-    econstructor; eauto.
-     Admitted. 
+  intros. inversion H; subst.
+  econstructor.
+  - induction H0; econstructor. apply stack_extend_val; eauto. eauto.
+  - induction H3; econstructor. apply stack_extend_val; eauto. eauto.
+Qed.
 
 Inductive wf : class -> option (option vl_stack) -> Prop :=
 | wf_opt : forall v c, wf_val c v -> wf c (Some (Some v))
@@ -373,7 +368,7 @@ Proof.
     repeat constructor.
   Case "VAbs".
     repeat constructor. destruct s; try solve by inversion.
-    simpl in H11. inversion H11; subst.
+    simpl in H11. inversion H11; subst; clear H11.
     econstructor. simpl. eauto.
     inversion H14. subst. 
     inversion H1. subst. 
