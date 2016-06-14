@@ -587,7 +587,7 @@ Proof.
         destruct n0. 
         + assert (wf Second (Some (Some (vabs_stack H8 i First t)))). { subst lS0. eapply fc_eval; eauto. }
           assert (wf First (Some (Some  v_stack0))). { subst lS0. eapply fc_eval; eauto. }
-          assert (fc_env ((v_stack0 :: H8))). { inversion H12 as [a b H12val]; inversion H13; inversion H12val; subst. constructor; eauto. }
+          assert (fc_env ((v_stack0 :: H8))). { inversion H12 as [a b H12val| |]; inversion H13; inversion H12val; subst. constructor; eauto. }
           assert (sc_env ((vabs_stack H8 i First t :: fr0, idx) :: lS0)). 
             { constructor. subst lS0; eauto. constructor. inversion H12; eauto. eapply sc_frame; eauto. }
           eapply equiv_fc;eauto. eapply IHk; eauto. eapply stack_extend. simpl.
