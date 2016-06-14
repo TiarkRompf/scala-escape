@@ -460,9 +460,8 @@ Theorem fc_eval : forall k fr lS env_stack t v_stack c,
   wf c v_stack.
 Proof.
   intros.
-  destruct v_stack as [v_stack|].
-  destruct v_stack as [v_stack|].
-  generalize dependent fr. generalize dependent lS. generalize dependent env_stack0.
+  destruct v_stack as [v_stack|];[destruct v_stack as [v_stack|]|].
+  - generalize dependent fr. generalize dependent lS. generalize dependent env_stack0.
   generalize dependent t. generalize dependent v_stack. generalize dependent c.
   induction k; intros.
   Case "k = 0". inversion H.
@@ -471,13 +470,13 @@ Proof.
      SCase "True". constructor. constructor.
      SCase "False". constructor. constructor.
    
-     - SCase "Var". destruct v; destruct c; try solve by inversion.
-       + rewrite H3. constructor. eapply index_fc. eassumption. inversion H3. eauto.
-       + rewrite H3. constructor. apply (lookup_snd env_stack0 (fr::lS) (VFst i) v_stack); inversion H3; eauto.
-       + rewrite H3. constructor. apply (lookup_snd env_stack0 (fr::lS) (VSnd i) v_stack); inversion H3; eauto.
+     + SCase "Var". destruct v; destruct c; try solve by inversion.
+       * rewrite H3. constructor. eapply index_fc. eassumption. inversion H3. eauto.
+       * rewrite H3. constructor. apply (lookup_snd env_stack0 (fr::lS) (VFst i) v_stack); inversion H3; eauto.
+       * rewrite H3. constructor. apply (lookup_snd env_stack0 (fr::lS) (VSnd i) v_stack); inversion H3; eauto.
 
  
-     - SCase "App".
+     + SCase "App".
        
        remember (teval_stack k (fr::lS) env_stack0 t1 Second) as tf_stack.
 
@@ -500,7 +499,7 @@ Proof.
           assert (wf First (Some (Some tx_stack))) as FTX. { eapply IHk; eauto. }
           assert (wf Second (Some (Some (vabs_stack h s First t)))) as SFX. { eapply IHk; eauto. }
 
-          inversion FTX; inversion SFX as [a b SFXV]; inversion SFXV; subst.
+          inversion FTX; inversion SFX as [a b SFXV| |]; inversion SFXV; subst.
 
           eapply IHk with (env_stack0 := (tx_stack :: h)).
             constructor; eauto.
@@ -512,20 +511,20 @@ Proof.
           assert (wf Second (Some (Some tx_stack))) as FTX. { eapply IHk; eauto. }
           assert (wf Second (Some (Some (vabs_stack h s Second t)))) as SFX. { eapply IHk; eauto. }
 
-          inversion FTX; inversion SFX as [a b SFXV]; inversion SFXV; subst.
+          inversion FTX; inversion SFX as [a b SFXV| |]; inversion SFXV; subst.
 
           eapply IHk with (env_stack0 := h); eauto.
             constructor; eauto. constructor.  assumption.
               constructor. eauto.
               eapply sc_frame. eapply H1. eauto.
 
-    - SCase "Abs".
+    + SCase "Abs".
       destruct c.
       * destruct fr. constructor. constructor. eauto.
       * constructor. constructor. eauto.
-  - admit.
-  - admit.
-Qed.       
+  - constructor.
+  - constructor.
+Qed.
 
 Theorem teval_equiv : forall k n t env v lS fr env_stack v_stack,
      teval k env t n = v ->
