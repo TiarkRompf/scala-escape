@@ -354,6 +354,8 @@ Qed.
 
 Inductive wf : class -> option (option vl_stack) -> Prop :=
 | wf_opt : forall v c, wf_val c v -> wf c (Some (Some v))
+| wf_timeout: forall c, wf c None
+| wf_stuck: forall c, wf c (Some None)
 .            
 
 Theorem equiv_fc : forall fr lS v v_stack,
@@ -376,9 +378,14 @@ Proof.
     admit. (* from H4: fc_env h *)
     assert (Forall2 (fun (v : vl) (vs : vl_stack) => equiv_val lS v vs) H2 h).
     admit. (* by induction on H9 *)
-    assert (H5 = []). destruct H5. eauto. inversion H15. subst H5. 
+    assert (H5 = []). destruct H5. eauto. inversion H13. subst H5. 
 
-    econstructor. eauto. eauto. 
+    econstructor. eauto. eauto.
+
+    (* timeout *)
+    inversion H. subst. eauto.
+    (* stuck *)
+    inversion H. subst. inversion H4. subst. eauto. 
 Qed.
 
 Lemma index_fc: forall H x v,
