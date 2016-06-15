@@ -151,6 +151,13 @@ Proof.
     apply IHn. intro Hc. apply H. apply le_n_S. assumption.
 Qed.
 
+Theorem false_beq_nat: forall n n' : nat,
+     n <> n' ->
+     beq_nat n n' = false.
+Proof. 
+(* An exercise in Logic.v *)
+Admitted.
+
 
 Inductive appears_in (n : nat) : list nat -> Prop :=
 | ai_here : forall l, appears_in n (n::l)
