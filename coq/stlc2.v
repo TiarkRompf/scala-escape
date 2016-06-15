@@ -43,8 +43,8 @@ end.
 
 Definition lookup_stack {X : Type} (n : var) (h: heap X) (st : stack X) : option X :=
 match n with
-| VFst i => index i h
-| VSnd i => match st with
+| V First i => index i h
+| V Second i => match st with
               | (fr,off)::_ =>  if ble_nat off i then index (i - off) fr else None
               | _ => None
             end
@@ -108,8 +108,8 @@ Fixpoint teval_stack(k: nat) (st : stack vl_stack)(env: heap vl_stack)(t: tm)(n:
       match t, n with
         | ttrue, _              => Some (Some (vbool_stack true))
         | tfalse, _             => Some (Some (vbool_stack false))
-        | tvar (VFst i), First  => Some (lookup_stack (VFst i) env st)
-        | tvar (VSnd i), First  => Some None
+        | tvar (V First i),  First  => Some (lookup_stack (V First i) env st)
+        | tvar (V Second i), First  => Some None
         | tvar i, Second        => Some (lookup_stack i env st)
         | tabs m y, First       => (* Some (Some (vabs_stack env (S0 0) m y)) *)
                                    match st with
@@ -155,10 +155,11 @@ with equiv_env : stack vl_stack -> venv -> venv_stack -> Prop :=
                       equiv_env lS (Def vl H1 (H2++H20) (length H20)) (H1s, (H2s, length H20)) 
 .
 
+(*
 Print Forall2_ind.
 Print equiv_val_ind.
 Print equiv_env_ind.
-
+*)
 
 Definition eqv_nested_ind := fun
   (Pv : stack vl_stack -> vl -> vl_stack -> Prop)
@@ -298,7 +299,7 @@ Qed.
 
 Lemma lookup2_equiv : forall env H fr lS i,
    equiv_env (fr::lS) env (H, fr) ->
-   equiv_opt (fr::lS) (lookup (VSnd i) env) (lookup_stack (VSnd i) H (fr::lS)).
+   equiv_opt (fr::lS) (lookup (V Second i) env) (lookup_stack (V Second i) H (fr::lS)).
 Proof.
   intros. destruct env. destruct fr. simpl.
   eapply index2_equiv in H0. destruct H0. subst.   
@@ -436,17 +437,18 @@ Lemma lookup_snd : forall H lS x v,
    wf_val Second v.
 Proof.
    intros.
-   destruct v; destruct x; try solve by inversion.
-   constructor.
-   constructor.
+   destruct v.
+   destruct x; destruct c; try solve by inversion.
+   constructor. constructor.
+   destruct x. destruct c0. try solve by inversion. 
    constructor. assert (wf_val First (vabs_stack h s c t)). eapply index_fc; eauto.
-       inversion H3; eauto.
+   inversion H3; eauto.
    induction H1.
-      - inversion H2.
+      - inversion H2. 
       - case_eq (ble_nat idx i); intros E; simpl in H2.
-        + rewrite E in H2. induction H3. inversion H2.
+        + rewrite E in H2. induction H3. inversion H2. 
         case_eq (beq_nat (i - idx) (length l)); intros E2; simpl in H2.
-          * rewrite E2 in H2. inversion H2; subst; eauto.
+          * rewrite E2 in H2. inversion H2; subst; eauto. 
           * rewrite E2 in H2. apply IHForall. simpl. eauto.
         + rewrite E in H2. inversion H2.
 Qed.
@@ -499,10 +501,10 @@ Proof.
      SCase "True". constructor. constructor.
      SCase "False". constructor. constructor.
    
-     + SCase "Var". destruct v; destruct c; try solve by inversion.
+     + SCase "Var". destruct v; destruct c0; destruct c; try solve by inversion.
        * rewrite H3. constructor. eapply index_fc. eassumption. inversion H3. eauto.
-       * rewrite H3. constructor. apply (lookup_snd env_stack0 (fr::lS) (VFst i) v_stack); inversion H3; eauto.
-       * rewrite H3. constructor. apply (lookup_snd env_stack0 (fr::lS) (VSnd i) v_stack); inversion H3; eauto.
+       * rewrite H3. constructor. apply (lookup_snd env_stack0 (fr::lS) (V First i) v_stack); inversion H3; eauto.
+       * rewrite H3. constructor. apply (lookup_snd env_stack0 (fr::lS) (V Second i) v_stack); inversion H3; eauto.
 
  
      + SCase "App".
@@ -572,9 +574,8 @@ Proof.
     
       - SCase "Var".
         clear H2; clear H3.
-        destruct env; destruct v0; destruct n; try solve by inversion; simpl.
+        destruct env; destruct v0; destruct n; destruct c; try solve by inversion; simpl.
         + (* VFst, First *) econstructor. eapply index1_equiv; eauto.
-        + (* VFst, Second *) econstructor. eapply index1_equiv; eauto.
         + (* VSnd, First  *) econstructor.
            case_eq (ble_nat (length l0) i); intros E. 
            SSCase "i > length l0".
@@ -584,10 +585,11 @@ Proof.
                constructor. 
            SSCase "i <= length l0".
                constructor.
+        + (* VFst, Second *) econstructor. eapply index1_equiv; eauto.
         + (*VSnd, Second *) econstructor.
-               replace (if ble_nat n0 i then index i l0 else None) with (lookup (VSnd i) (Def vl l l0 n0)); eauto.
+               replace (if ble_nat n0 i then index i l0 else None) with (lookup (V Second i) (Def vl l l0 n0)); eauto.
                replace (let (fr0, off) := fr in if ble_nat off i then index (i - off) fr0 else None) with
-                    (lookup_stack (VSnd i) env_stack0 (fr::lS)); eauto.
+                    (lookup_stack (V Second i) env_stack0 (fr::lS)); eauto.
                eapply lookup2_equiv; eauto.
 
       - SCase "App". (* case result Some *)
