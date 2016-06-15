@@ -65,7 +65,7 @@ Inductive wf_val : class -> vl_stack -> Prop :=
       wf_val Second (vabs_stack vheap i class tm)
 with fc_env : heap vl_stack -> Prop := (* H, x^1 :v *)
 | heap_nil : fc_env []
-| heap_const : forall v vheap,
+| heap_cons : forall v vheap,
      wf_val First v ->
      fc_env vheap ->
      fc_env (v::vheap)
@@ -358,26 +358,74 @@ Inductive wf : class -> option (option vl_stack) -> Prop :=
 | wf_stuck: forall c, wf c (Some None)
 .            
 
-Theorem equiv_fc : forall fr lS v v_stack,
-  equiv_res (fr::lS) v v_stack -> wf First v_stack -> equiv_res lS v v_stack.
+Lemma fc_env_wf: forall H,
+  fc_env H -> (Forall (fun v => wf_val First v) H).
+Proof.
+  admit.
+Qed.
+
+Theorem equiv_val_fc : forall lS v v_stack fr,
+  equiv_val (fr::lS) v v_stack -> wf_val First v_stack -> equiv_val lS v v_stack.
 Proof.
   (* idea: if v_stack is first class, it is a bool or a closure without stack frame. *)
   (* it doesn't need a stack frame *)
   intros.
-  inversion H0; subst.
-  destruct v0; inversion H; subst; inversion H5; subst; inversion H6; subst; clear H; clear H5.
-  Case "Bool".
-    repeat constructor.
-  Case "VAbs".
+  eapply (eqv_nested_ind
+            (fun lS1 v v_stack =>
+               lS1 = fr::lS ->
+               equiv_val (fr::lS) v v_stack ->
+               wf_val First v_stack ->
+               equiv_val lS v v_stack)
+            (fun lS1 v v_stack =>
+               lS1 = fr::lS ->
+               equiv_env (fr::lS) v v_stack ->
+               fc_env (fst v_stack) -> (fst (snd v_stack)) = [] ->
+               equiv_env lS v v_stack)) with (s:=fr::lS);
+    intros; try subst lS0.
+  - Case "Bool".
+    constructor.
+  - Case "VAbs".
+    inversion H8. subst. 
+    econstructor; eauto.
+    inversion H4. subst.
+    inversion H7. subst.
+    inversion H15. subst.
+    eapply H5; eauto. 
+  - Case "env".
+    simpl in H7. simpl in H8. subst. eapply fc_env_wf in H7.
+    inversion H4. subst. inversion H6. inversion H16. subst. 
+    constructor.
+    + clear H6. 
+      induction H12.
+      * eauto.
+      * inversion H3. inversion H7. subst. 
+        constructor. eapply H9; eauto. eauto. 
+    + eauto.
+  - eauto.
+  - eauto.
+  - eauto.
+  - eauto. 
+Qed.
+    
+    constructor. 
+    inversion H3. subst. eapply H3. 
+    
+    admit.
+    simpl in H6. subst. inversion H4. eauto. 
+
+  - admit.
+  - eauto. 
+    
+  - Case "?". 
     repeat constructor. destruct s; try solve by inversion.
     simpl in H11. inversion H11; subst; clear H11.
     econstructor. simpl. eauto.
     inversion H14. subst. 
     inversion H1. subst. 
-    assert (Forall (fun v => wf_val First v) h).
-    admit. (* from H4: fc_env h *)
+    assert (Forall (fun v => wf_val First v) h). eapply fc_env_wf; eauto. 
     assert (Forall2 (fun (v : vl) (vs : vl_stack) => equiv_val lS v vs) H2 h).
     admit. (* by induction on H9 *)
+    (* Forall2 (fun (v : vl) (vs : vl_stack) => equiv_val (fr :: lS) v vs) H2 h*)
     assert (H5 = []). destruct H5. eauto. inversion H13. subst H5. 
 
     econstructor. eauto. eauto.
@@ -387,6 +435,12 @@ Proof.
     (* stuck *)
     inversion H. subst. inversion H4. subst. eauto. 
 Qed.
+
+Theorem equiv_fc : forall fr lS v v_stack,
+  equiv_res (fr::lS) v v_stack -> wf First v_stack -> equiv_res lS v v_stack.
+Proof.
+  
+
 
 Lemma index_fc: forall H x v,
    fc_env H ->
