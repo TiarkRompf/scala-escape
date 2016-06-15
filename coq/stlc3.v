@@ -361,7 +361,7 @@ Inductive wf : class -> option (option vl_stack) -> Prop :=
 Lemma fc_env_wf: forall H,
   fc_env H -> (Forall (fun v => wf_val First v) H).
 Proof.
-  admit.
+  intros. induction H0. eauto. eauto. 
 Qed.
 
 Theorem equiv_val_fc : forall lS v v_stack fr,
