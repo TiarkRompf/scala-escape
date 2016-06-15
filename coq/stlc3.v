@@ -407,40 +407,15 @@ Proof.
   - eauto. 
 Qed.
     
-    constructor. 
-    inversion H3. subst. eapply H3. 
-    
-    admit.
-    simpl in H6. subst. inversion H4. eauto. 
-
-  - admit.
-  - eauto. 
-    
-  - Case "?". 
-    repeat constructor. destruct s; try solve by inversion.
-    simpl in H11. inversion H11; subst; clear H11.
-    econstructor. simpl. eauto.
-    inversion H14. subst. 
-    inversion H1. subst. 
-    assert (Forall (fun v => wf_val First v) h). eapply fc_env_wf; eauto. 
-    assert (Forall2 (fun (v : vl) (vs : vl_stack) => equiv_val lS v vs) H2 h).
-    admit. (* by induction on H9 *)
-    (* Forall2 (fun (v : vl) (vs : vl_stack) => equiv_val (fr :: lS) v vs) H2 h*)
-    assert (H5 = []). destruct H5. eauto. inversion H13. subst H5. 
-
-    econstructor. eauto. eauto.
-
-    (* timeout *)
-    inversion H. subst. eauto.
-    (* stuck *)
-    inversion H. subst. inversion H4. subst. eauto. 
-Qed.
-
 Theorem equiv_fc : forall fr lS v v_stack,
   equiv_res (fr::lS) v v_stack -> wf First v_stack -> equiv_res lS v v_stack.
 Proof.
-  
-
+  intros.
+  inversion H; subst. eauto. constructor.
+  inversion H1; subst. eauto. constructor.
+  inversion H0. 
+  eapply equiv_val_fc; eauto. 
+Qed.  
 
 Lemma index_fc: forall H x v,
    fc_env H ->
