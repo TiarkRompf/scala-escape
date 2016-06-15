@@ -8,17 +8,22 @@ Require Import Coq.Program.Equality.
 
 Definition id := nat.
 
+Inductive class : Type :=
+  | First : class
+  | Second : class
+.
+
 (* term variables occurring in types *)
 Inductive var : Type :=
-| varF : id -> var (* free, in concrete environment *)
-| varH : id -> var (* free, in abstract environment  *)
-| varB : id -> var (* locally-bound variable *)
+| varF : id -> class -> var (* free, in concrete environment *)
+| varH : id -> class -> var (* free, in abstract environment  *)
+| varB : id -> class -> var (* locally-bound variable *)
 .
 
 Inductive ty : Type :=
 | TTop : ty
 (* (z: T) -> T^z *)
-| TAll : ty -> ty -> ty
+| TAll : ty -> class -> ty -> ty
 (* x.Type *)
 | TSel : var -> ty
 (* { Type = T } or { Type <: T } *)
@@ -27,25 +32,27 @@ Inductive ty : Type :=
 
 Inductive tm : Type :=
 (* x -- free variable, matching concrete environment *)
-| tvar : id -> tm
+| tvar : id -> class -> tm
 (* { Type = T } *)
 | ttyp : ty -> tm
 (* lambda x:T.t *)
-| tabs : ty -> tm -> tm
+| tabs : ty -> class -> tm -> tm
 (* t t *)
 | tapp : tm -> tm -> tm
 .
 
+Definition env X := list (option (class * X)).
+
 Inductive vl : Type :=
 (* a closure for a lambda abstraction *)
-| vabs : list vl (*H*) -> ty -> tm -> vl
+| vabs : env vl (*H*) -> ty -> class -> tm -> vl
 (* a closure for a first-class type *)
-| vty : list vl (*H*) -> ty -> vl
+| vty : env vl (*H*) -> ty -> vl
 .
 
-Definition tenv := list ty. (* Gamma environment: static *)
-Definition venv := list vl. (* H environment: run-time *)
-Definition aenv := list (venv*ty). (* J environment: abstract at run-time *)
+Definition tenv := env ty. (* Gamma environment: static *)
+Definition venv := env vl. (* H environment: run-time *)
+Definition aenv := env (venv*ty). (* J environment: abstract at run-time *)
 
 (* ### Representation of Bindings ### *)
 
@@ -61,19 +68,19 @@ Fixpoint indexr {X : Type} (n : id) (l : list X) : option X :=
 Inductive closed: nat(*B*) -> nat(*H*) -> nat(*F*) -> ty -> Prop :=
 | cl_top: forall i j k,
     closed i j k TTop
-| cl_all: forall i j k T1 T2,
+| cl_all: forall i j k T1 T2 c,
     closed i j k T1 ->
     closed (S i) j k T2 ->
-    closed i j k (TAll T1 T2)
-| cl_sel: forall i j k x,
+    closed i j k (TAll T1 c T2)
+| cl_sel: forall i j k x c,
     k > x ->
-    closed i j k (TSel (varF x))
-| cl_selh: forall i j k x,
+    closed i j k (TSel (varF x c))
+| cl_selh: forall i j k x c,
     j > x ->
-    closed i j k (TSel (varH x))
-| cl_selb: forall i j k x,
+    closed i j k (TSel (varH x c))
+| cl_selb: forall i j k x c,
     i > x ->
-    closed i j k (TSel (varB x))
+    closed i j k (TSel (varB x c))
 | cl_mem: forall i j k b T,
     closed i j k T ->
     closed i j k (TMem b T)
@@ -83,12 +90,12 @@ Inductive closed: nat(*B*) -> nat(*H*) -> nat(*F*) -> ty -> Prop :=
 (* substitute var u for all occurrences of (varB k) *)
 Fixpoint open_rec (k: nat) (u: var) (T: ty) { struct T }: ty :=
   match T with
-    | TTop        => TTop
-    | TAll T1 T2  => TAll (open_rec k u T1) (open_rec (S k) u T2)
-    | TSel (varF x) => TSel (varF x)
-    | TSel (varH i) => TSel (varH i)
-    | TSel (varB i) => if beq_nat k i then TSel u else TSel (varB i)
-    | TMem b T0  => TMem b (open_rec k u T0)
+    | TTop            => TTop
+    | TAll T1 c T2    => TAll (open_rec k u T1) c (open_rec (S k) u T2)
+    | TSel (varF x c) => TSel (varF x c)
+    | TSel (varH i c) => TSel (varH i c)
+    | TSel (varB i c) => if beq_nat k i then TSel u else TSel (varB i c)
+    | TMem b T0       => TMem b (open_rec k u T0)
   end.
 
 Definition open u T := open_rec 0 u T.
@@ -96,23 +103,37 @@ Definition open u T := open_rec 0 u T.
 (* Locally-nameless encoding with respect to varH variables. *)
 Fixpoint subst (U : var) (T : ty) {struct T} : ty :=
   match T with
-    | TTop         => TTop
-    | TAll T1 T2   => TAll (subst U T1) (subst U T2)
-    | TSel (varB i) => TSel (varB i)
-    | TSel (varF i) => TSel (varF i)
-    | TSel (varH i) => if beq_nat i 0 then TSel U else TSel (varH (i-1))
-    | TMem b T0     => TMem b (subst U T0)
+    | TTop            => TTop
+    | TAll T1 c T2    => TAll (subst U T1) c (subst U T2)
+    | TSel (varB i c) => TSel (varB i c)
+    | TSel (varF i c) => TSel (varF i c)
+    | TSel (varH i c) => if beq_nat i 0 then TSel U else TSel (varH (i-1) c)
+    | TMem b T0       => TMem b (subst U T0)
   end.
 
 Fixpoint nosubst (T : ty) {struct T} : Prop :=
   match T with
-    | TTop         => True
-    | TAll T1 T2   => nosubst T1 /\ nosubst T2
-    | TSel (varB i) => True
-    | TSel (varF i) => True
-    | TSel (varH i) => i <> 0
-    | TMem b T0     => nosubst T0
+    | TTop            => True
+    | TAll T1 c T2    => nosubst T1 /\ nosubst T2
+    | TSel (varB i c) => True
+    | TSel (varF i c) => True
+    | TSel (varH i c) => i <> 0
+    | TMem b T0       => nosubst T0
   end.
+
+
+Definition sanitize_env {X} (c : class) (l: env X)  := 
+  match c with
+    | First =>
+      map (fun p =>
+             match p with
+               | Some (First, x) => Some (First, x)
+               | Some (Second, x) => None
+               | None => None
+             end) l
+    | Second => l
+  end.
+
 
 (* ### Static Subtyping ### *)
 (*
@@ -135,81 +156,81 @@ Inductive stp: tenv -> tenv -> ty -> ty -> Prop :=
     stp G1 GH T1 T2 ->
     stp G1 GH T2 T1 ->
     stp G1 GH (TMem true T1) (TMem true T2)
-| stp_sel1: forall G1 GH TX T2 x,
-    indexr x G1 = Some TX ->
+| stp_sel1: forall G1 GH TX T2 x c,
+    indexr x G1 = Some (Some (c,TX)) ->
     closed 0 0 (length G1) TX ->
     stp G1 GH TX (TMem false T2) ->
-    stp G1 GH (TSel (varF x)) T2
-| stp_sel2: forall G1 GH TX T T1 x,
-    indexr x G1 = Some TX ->
+    stp G1 GH (TSel (varF x c)) T2
+| stp_sel2: forall G1 GH TX T T1 x c,
+    indexr x G1 = Some (Some (c, TX)) ->
     closed 0 0 (length G1) TX ->
     stp G1 [] TX (TMem true T) ->
     stp G1 GH T1 T ->
-    stp G1 GH T1 (TSel (varF x))
-| stp_selx: forall G1 GH v x,
+    stp G1 GH T1 (TSel (varF x c))
+| stp_selx: forall G1 GH v x c,
     (* This is a bit looser than just being able to select on TMem vars. *)
-    indexr x G1 = Some v ->
-    stp G1 GH (TSel (varF x)) (TSel (varF x))
-| stp_sela1: forall G1 GH TX T2 x,
-    indexr x GH = Some TX ->
+    indexr x G1 = Some (Some (c,v)) ->
+    stp G1 GH (TSel (varF x c)) (TSel (varF x c))
+| stp_sela1: forall G1 GH TX T2 x c,
+    indexr x GH = Some (Some (c,TX)) ->
     closed 0 x (length G1) TX ->
     stp G1 GH TX (TMem false T2) ->
-    stp G1 GH (TSel (varH x)) T2
-| stp_sela2: forall G1 GH TX T T1 GU GL x,
-    indexr x GH = Some TX ->
+    stp G1 GH (TSel (varH x c)) T2
+| stp_sela2: forall G1 GH TX T T1 GU GL x c,
+    indexr x GH = Some (Some (c,TX)) ->
     closed 0 x (length G1) TX ->
     length GL = x ->
     GH = GU ++ GL ->
     stp G1 GL TX (TMem true T) ->
     stp G1 GH T1 T ->
-    stp G1 GH T1 (TSel (varH x))
-| stp_selax: forall G1 GH v x,
+    stp G1 GH T1 (TSel (varH x c))
+| stp_selax: forall G1 GH v x c,
     (* This is a bit looser than just being able to select on TMem vars. *)
-    indexr x GH = Some v  ->
-    stp G1 GH (TSel (varH x)) (TSel (varH x))
-| stp_all: forall G1 GH T1 T2 T3 T4 x,
+    indexr x GH = Some (Some (c,v))  ->
+    stp G1 GH (TSel (varH x c)) (TSel (varH x c))
+| stp_all: forall G1 GH T1 T2 T3 T4 x c,
     stp G1 GH T3 T1 ->
     x = length GH ->
     closed 1 (length GH) (length G1) T2 ->
     closed 1 (length GH) (length G1) T4 ->
-    stp G1 (T3::GH) (open (varH x) T2) (open (varH x) T4) ->
-    stp G1 GH (TAll T1 T2) (TAll T3 T4)
+    stp G1 ((Some (c,T3))::GH) (open (varH x c) T2) (open (varH x c) T4) ->
+    stp G1 GH (TAll T1 c T2) (TAll T3 c T4)
 .
 
 (* ### Type Assignment ### *)
-Inductive has_type : tenv -> tm -> ty -> Prop :=
-| t_var: forall x env T1,
-           indexr x env = Some T1 ->
+Inductive has_type : tenv -> tm -> class -> ty -> Prop :=
+| t_var: forall x env T1 c,
+           indexr x (sanitize_env c env) = Some (Some (c,T1)) ->
            stp env [] T1 T1 ->
-           has_type env (tvar x) T1
-| t_typ: forall env T1,
+           has_type env (tvar x c) c T1
+| t_typ: forall env T1 c,
            closed 0 0 (length env) T1 ->
-           has_type env (ttyp T1) (TMem true T1)
-| t_app: forall env f x T1 T2,
-           has_type env f (TAll T1 T2) ->
-           has_type env x T1 ->
+           has_type env (ttyp T1) c (TMem true T1)
+| t_app: forall env f x T1 T2 c cf,
+           has_type env f Second (TAll T1 cf T2) ->
+           has_type env x cf T1 ->
            closed 0 0 (length env) T2 ->
-           has_type env (tapp f x) T2
-| t_dapp:forall env f x T1 T2 T,
-           has_type env f (TAll T1 T2) ->
-           has_type env (tvar x) T1 ->
-           T = open (varF x) T2 ->
+           has_type env (tapp f x) c T2
+| t_dapp:forall env f x T1 T2 T c cf,
+           has_type env f Second (TAll T1 cf T2) ->
+           has_type env (tvar x cf) cf T1 ->
+           T = open (varF x cf) T2 ->
            closed 0 0 (length env) T ->
-           has_type env (tapp f (tvar x)) T
-| t_abs: forall env y T1 T2,
-           has_type (T1::env) y (open (varF (length env)) T2) ->
-           closed 0 0 (length env) (TAll T1 T2) ->
-           has_type env (tabs T1 y) (TAll T1 T2)
-| t_sub: forall env e T1 T2,
-           has_type env e T1 ->
+           has_type env (tapp f (tvar x cf)) c T
+| t_abs: forall env y T1 T2 c cf,
+           has_type ((Some (cf,T1))::env) y First (open (varF (length env) c) T2) ->
+           closed 0 0 (length env) (TAll T1 cf T2) ->
+           has_type env (tabs T1 cf y) c (TAll T1 cf T2)
+| t_sub: forall env e T1 T2 c,
+           has_type env e c T1 ->
            stp env [] T1 T2 ->
-           has_type env e T2
+           has_type env e c T2
 .
 
 Definition base (v:vl): venv :=
   match v with
     | vty GX _ => GX
-    | vabs GX _ _ => GX
+    | vabs GX _ _ _ => GX
   end.
 
 (* ### Runtime Subtyping ### *)
@@ -233,62 +254,62 @@ Inductive stp2: bool (* whether selections are precise *) ->
 (* concrete type variables *)
 (* precise/invertible bounds *)
 (* vty already marks binding as type binding, so no need for additional TMem marker *)
-| stp2_strong_sel1: forall G1 G2 GX TX x T2 GH n1,
-    indexr x G1 = Some (vty GX TX) ->
+| stp2_strong_sel1: forall G1 G2 GX TX x T2 GH n1 c,
+    indexr x G1 = Some (Some (c, vty GX TX)) ->
     val_type GX (vty GX TX) (TMem true TX) -> (* for downgrade *)
     closed 0 0 (length GX) TX ->
     stp2 true true GX TX G2 T2 GH n1 ->
-    stp2 true true G1 (TSel (varF x)) G2 T2 GH (S n1)
-| stp2_strong_sel2: forall G1 G2 GX TX x T1 GH n1,
-    indexr x G2 = Some (vty GX TX) ->
+    stp2 true true G1 (TSel (varF x c)) G2 T2 GH (S n1)
+| stp2_strong_sel2: forall G1 G2 GX TX x T1 GH n1 c,
+    indexr x G2 = Some (Some (c, vty GX TX)) ->
     val_type GX (vty GX TX) (TMem true TX) -> (* for downgrade *)
     closed 0 0 (length GX) TX ->
     stp2 true false G1 T1 GX TX GH n1 ->
-    stp2 true true G1 T1 G2 (TSel (varF x)) GH (S n1)
+    stp2 true true G1 T1 G2 (TSel (varF x c)) GH (S n1)
 (* imprecise type *)
-| stp2_sel1: forall G1 G2 v TX x T2 GH n1,
-    indexr x G1 = Some v ->
+| stp2_sel1: forall G1 G2 v TX x T2 GH n1 c,
+    indexr x G1 = Some (Some (c,v)) ->
     val_type (base v) v TX ->
     closed 0 0 (length (base v)) TX ->
     stp2 false false (base v) TX G2 (TMem false T2) GH n1 ->
-    stp2 false true G1 (TSel (varF x)) G2 T2 GH (S n1)
-| stp2_sel2: forall G1 G2 GM v TX x T T1 GH n1 n2,
-    indexr x G2 = Some v ->
+    stp2 false true G1 (TSel (varF x c)) G2 T2 GH (S n1)
+| stp2_sel2: forall G1 G2 GM v TX x T T1 GH n1 n2 c,
+    indexr x G2 = Some (Some (c,v)) ->
     val_type (base v) v TX ->
     closed 0 0 (length (base v)) TX ->
     stp2 false false (base v) TX GM (TMem true T) [] n1 ->
     stp2 false false G1 T1 GM T GH n2 ->
-    stp2 false true G1 T1 G2 (TSel (varF x)) GH (S (n1+n2))
-| stp2_selx: forall G1 G2 v x1 x2 GH s n,
+    stp2 false true G1 T1 G2 (TSel (varF x c)) GH (S (n1+n2))
+| stp2_selx: forall G1 G2 v x1 x2 GH s n c,
     indexr x1 G1 = Some v ->
     indexr x2 G2 = Some v ->
-    stp2 s true G1 (TSel (varF x1)) G2 (TSel (varF x2)) GH (S n)
+    stp2 s true G1 (TSel (varF x1 c)) G2 (TSel (varF x2 c)) GH (S n)
 
 (* abstract type variables *)
-| stp2_sela1: forall G1 G2 GX TX x T2 GH n1,
-    indexr x GH = Some (GX, TX) ->
+| stp2_sela1: forall G1 G2 GX TX x T2 GH n1 c,
+    indexr x GH = Some (Some (c, (GX, TX))) ->
     closed 0 x (length GX) TX ->
     stp2 false false GX TX G2 (TMem false T2) GH n1 ->
-    stp2 false true G1 (TSel (varH x)) G2 T2 GH (S n1)
-| stp2_sela2: forall G1 G2 GX GM T1 TX T x GH GU GL n1 n2,
-    indexr x GH = Some (GX, TX) ->
+    stp2 false true G1 (TSel (varH x c)) G2 T2 GH (S n1)
+| stp2_sela2: forall G1 G2 GX GM T1 TX T x GH GU GL n1 n2 c,
+    indexr x GH = Some (Some (c, (GX, TX))) ->
     closed 0 x (length GX) TX ->
     length GL = x ->
     GH = GU ++ GL ->
     stp2 false false GX TX GM (TMem true T) GL n1 ->
     stp2 false false G1 T1 GM T GH n2 ->
-    stp2 false true G1 T1 G2 (TSel (varH x)) GH (S (n1+n2))
-| stp2_selax: forall G1 G2 v x GH s n,
+    stp2 false true G1 T1 G2 (TSel (varH x c)) GH (S (n1+n2))
+| stp2_selax: forall G1 G2 v x GH s n c,
     indexr x GH = Some v ->
-    stp2 s true G1 (TSel (varH x)) G2 (TSel (varH x)) GH (S n)
+    stp2 s true G1 (TSel (varH x c)) G2 (TSel (varH x c)) GH (S n)
 
-| stp2_all: forall G1 G2 T1 T2 T3 T4 x GH s n1 n2,
+| stp2_all: forall G1 G2 T1 T2 T3 T4 x GH s n1 n2 c,
     stp2 false false G2 T3 G1 T1 GH n1 ->
     x = length GH ->
     closed 1 (length GH) (length G1) T2 ->
     closed 1 (length GH) (length G2) T4 ->
-    stp2 false false G1 (open (varH x) T2) G2 (open (varH x) T4) ((G2, T3)::GH) n2 ->
-    stp2 s true G1 (TAll T1 T2) G2 (TAll T3 T4) GH (S (n1 + n2))
+    stp2 false false G1 (open (varH x c) T2) G2 (open (varH x c) T4) ((Some (c, (G2, T3)))::GH) n2 ->
+    stp2 s true G1 (TAll T1 c T2) G2 (TAll T3 c T4) GH (S (n1 + n2))
 
 | stp2_wrapf: forall G1 G2 T1 T2 GH s n1,
     stp2 s true G1 T1 G2 T2 GH n1 ->
@@ -302,10 +323,13 @@ Inductive stp2: bool (* whether selections are precise *) ->
 (* consistent environment *)
 with wf_env : venv -> tenv -> Prop :=
 | wfe_nil : wf_env nil nil
-| wfe_cons : forall v t vs ts,
-    val_type (v::vs) v t ->
+| wfe_cons : forall v t vs ts c,
+    val_type ((Some (c,v))::vs) v t ->
     wf_env vs ts ->
-    wf_env (cons v vs) (cons t ts)
+    wf_env (cons (Some (c,v)) vs) (cons (Some (c,t)) ts)
+| wfe_dead : forall vs ts,
+    wf_env vs ts ->
+    wf_env (cons None vs) (cons None ts)
 
 (* value type assignment *)
 with val_type : venv -> vl -> ty -> Prop :=
@@ -313,19 +337,22 @@ with val_type : venv -> vl -> ty -> Prop :=
     wf_env venv tenv ->
     (exists n, stp2 true true venv (TMem true T1) env TE [] n) ->
     val_type env (vty venv T1) TE
-| v_abs: forall env venv tenv x y T1 T2 TE,
+| v_abs: forall env venv tenv x y T1 T2 TE c,
     wf_env venv tenv ->
-    has_type (T1::tenv) y (open (varF x) T2) ->
+    has_type ((Some (c,T1))::tenv) y First (open (varF x c) T2) ->
     length venv = x ->
-    (exists n, stp2 true true venv (TAll T1 T2) env TE [] n) ->
-    val_type env (vabs venv T1 y) TE
+    (exists n, stp2 true true venv (TAll T1 c T2) env TE [] n) ->
+    val_type env (vabs venv T1 c y) TE
 .
 
 Inductive wf_envh : venv -> aenv -> tenv -> Prop :=
 | wfeh_nil : forall vvs, wf_envh vvs nil nil
-| wfeh_cons : forall t vs vvs ts,
+| wfeh_cons : forall t vs vvs ts c,
     wf_envh vvs vs ts ->
-    wf_envh vvs (cons (vvs,t) vs) (cons t ts)
+    wf_envh vvs (cons (Some (c,(vvs,t))) vs) (cons (Some (c,t)) ts)
+| wfeh_dead : forall vs vvs ts,
+    wf_envh vvs vs ts ->
+    wf_envh vvs (cons None vs) (cons None ts)
 .
 
 Inductive valh_type : venv -> aenv -> (venv*ty) -> ty -> Prop :=
@@ -343,25 +370,28 @@ Some (Some v))   means result v
 Could use do-notation to clean up syntax.
 *)
 
-Fixpoint teval(n: nat)(env: venv)(t: tm){struct n}: option (option vl) :=
+Fixpoint teval(n: nat)(env: venv)(t: tm)(ct: class){struct n}: option (option vl) :=
   match n with
     | 0 => None
     | S n =>
       match t with
-        | tvar x     => Some (indexr x env)
-        | ttyp T => Some (Some (vty env T))
-        | tabs T y => Some (Some (vabs env T y))
+        | tvar x c     => Some (match indexr x (sanitize_env ct env) with
+                                  | Some (Some (c,x)) => Some x
+                                  | _ => None
+                                end)
+        | ttyp T       => Some (Some (vty env T))
+        | tabs T c y   => Some (Some (vabs env T c y))
         | tapp ef ex   =>
-          match teval n env ex with
+          match teval n env ef Second with
             | None => None
             | Some None => Some None
-            | Some (Some vx) =>
-              match teval n env ef with
+            | Some (Some (vty _ _)) => Some None
+            | Some (Some (vabs env2 _ c ey)) =>
+              match teval n env ex c with
                 | None => None
                 | Some None => Some None
-                | Some (Some (vty _ _)) => Some None
-                | Some (Some (vabs env2 _ ey)) =>
-                  teval n (vx::env2) ey
+                | Some (Some vx) =>
+                  teval n ((Some (c,vx))::env2) ey First
               end
           end
       end
