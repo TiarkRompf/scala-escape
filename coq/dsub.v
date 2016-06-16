@@ -2869,7 +2869,7 @@ Lemma invert_app: forall venv vf vx T1 T2 c,
   val_type venv vf (TAll T1 c T2) ->
   val_type venv vx T1 ->
   closed 0 0 (length venv) T2 ->
-  exists env tenv x y c T3 T4,
+  exists env tenv x y T3 T4,
     vf = (vabs env T3 c y) /\
     length env = x /\
     wf_env env tenv /\
@@ -2879,7 +2879,7 @@ Lemma invert_app: forall venv vf vx T1 T2 c,
 Proof.
   intros. inversion H; ev; try solve by inversion.
   inversion H5. subst.
-  eexists. eexists. eexists. eexists. eexists. eexists. eexists.
+  eexists. eexists. eexists. eexists. eexists. eexists.
   repeat split; eauto; remember (length venv1) as x.
 
   eapply stpd2_upgrade; eauto.
@@ -2906,18 +2906,18 @@ Proof.
   right. left. eauto.
 Qed.
 
-Lemma invert_dapp: forall venv vf vx xarg T1 T2,
-  val_type venv vf (TAll T1 T2) ->
+Lemma invert_dapp: forall venv vf vx xarg T1 T2 c,
+  val_type venv vf (TAll T1 c T2) ->
   val_type venv vx T1 ->
-  indexr xarg venv = Some vx ->
+  indexr xarg venv = Some (true,c,vx) ->
   closed 0 0 (length venv) (open (varF xarg) T2) ->
   exists env tenv x y T3 T4,
-    vf = (vabs env T3 y) /\
+    vf = (vabs env T3 c y) /\
     length env = x /\
     wf_env env tenv /\
-    has_type (T3::tenv) y (open (varF x) T4) /\
+    has_type ((true,c,T3)::tenv) y First (open (varF x) T4) /\
     stpd2 true true venv T1 env T3 [] /\
-    stpd2 true true (vx::env) (open (varF x) T4) venv (open (varF xarg) T2) [].
+    stpd2 true true ((true,c,vx)::env) (open (varF x) T4) venv (open (varF xarg) T2) [].
 Proof.
   intros. inversion H; ev; try solve by inversion.
   inversion H6. subst.
@@ -2928,21 +2928,21 @@ Proof.
   eapply stpd2_upgrade.
   eapply inv_vtp_half with (GH:=nil) in H0. ev.
   simpl in H23.
-  assert (stpd2 false false venv1 (open (varH 0) T3) venv0 (open (varH 0) T2) [(base vx, x0)]) as A. {
+  assert (stpd2 false false venv1 (open (varH 0) T3) venv0 (open (varH 0) T2) [(true,c,(base vx, x0))]) as A. {
     eapply stpd2_narrow. eassumption. eexists. eassumption.
   }
-  apply stp2_substitute with (GH0:=nil) (V:=vx) (GX:=base vx) (T1:=(open (varH 0) T3)) (T2:=(open (varH 0) T2)) (TX:=x0) (GH:=[(base vx, x0)]); eauto.
+  apply stp2_substitute with (GH0:=nil) (V:=vx) (GX:=base vx) (T1:=(open (varH 0) T3)) (T2:=(open (varH 0) T2)) (TX:=x0) (GH:=[(true,c,(base vx, x0))]) (a:=true) (c:=c); eauto.
   apply stpd2_extend1. eapply A.
-  left. exists (length venv1). exists vx.
+  left. exists (length venv1). exists vx. exists true. exists c.
   split. simpl. rewrite <- beq_nat_refl. reflexivity.
   split. reflexivity. split. reflexivity. split. assumption.
   subst x. unfold open. erewrite subst_open_zero. reflexivity.
-  simpl in H18. eapply H18.
-  left. exists xarg. exists vx.
+  simpl in H23. eapply H23.
+  left. exists xarg. exists vx. exists true. exists c.
   split. assumption.
   split. reflexivity. split. reflexivity. split. assumption.
   unfold open. erewrite subst_open_zero. reflexivity.
-  simpl in H20. eapply H20.
+  simpl in H24. eapply H24.
 Qed.
 
 (* ### Type Safety ### *)
