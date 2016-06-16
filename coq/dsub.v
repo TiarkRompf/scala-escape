@@ -2907,10 +2907,43 @@ Proof.
 Qed.
 
 
-Lemma index_unsanitize: forall xarg venv0 (vx:vl) c c1,
+
+
+Lemma sanitize_commute: forall {X} venv0 a c c1 (v:X),
+  (sanitize_env c ((a,c1,v)::venv0)) =
+  match c with
+    | First =>
+      match (a,c1,v) with
+          | (true, First, x) => (true, First, x)
+          | (true, Second, x) => (false, Second, x)
+          | (false, c, x) => (false, c, x)
+      end
+    | Second => (a,c1,v)
+  end ::(sanitize_env c venv0).
+Proof.
+  intros X G. induction G; intros. 
+  destruct c; destruct a; destruct c1; compute; eauto.
+  destruct c; destruct a; destruct c1; compute; eauto.
+Qed.
+
+
+Lemma index_unsanitize: forall venv0 xarg (vx:vl) c c1,
   indexr xarg (sanitize_env c venv0) = Some (true, c1, vx) ->                      
   indexr xarg venv0 = Some (true, c1, vx).
-Proof. admit. Qed.
+Proof.
+  intros G. induction G; intros.
+  destruct c; compute in H; inversion H.
+  destruct a as [[? ?] ?].
+  rewrite sanitize_commute in H. simpl in H.
+  assert (length (sanitize_env c G) = length G).
+  unfold sanitize_env. destruct c; try rewrite map_length; eauto.
+  case_eq (beq_nat xarg (length (sanitize_env c G))); intros E.
+  - rewrite E in H. simpl. rewrite H0 in E. rewrite E.
+    destruct c; destruct b; destruct c0; inversion H; eauto.
+  - rewrite E in H. simpl. rewrite H0 in E. rewrite E.
+    eauto. 
+Qed.
+
 
 Lemma invert_dapp: forall venv vf vx xarg T1 T2 c c1,
   val_type venv vf (TAll T1 c T2) ->
@@ -2957,7 +2990,7 @@ Qed.
  *)
 
 
-Lemma stp2_unsanitize: forall G1 G2 H T1 T2 a b c n,
+Lemma stp2_unsanitize2: forall G1 G2 H T1 T2 a b c n,
   stp2 a b G1 T1 (sanitize_env c G2) T2 H n ->
   stp2 a b G1 T1 G2 T2 H n.
 Proof. admit. Qed.
@@ -2967,15 +3000,31 @@ Lemma stp2_sanitize1: forall G1 G2 H T1 T2 a b c n,
   stp2 a b (sanitize_env c G1) T1 G2 T2 H n.
 Proof. admit. Qed.
 
-Lemma val_type_sanitize : forall env res T n,
+Lemma stp2_sanitize2: forall G1 G2 H T1 T2 a b c n,
+  stp2 a b G1 T1 G2 T2 H n ->
+  stp2 a b G1 T1 (sanitize_env c G2) T2 H n.
+Proof. admit. Qed.
+
+Lemma val_type_unsanitize : forall env res T n,
   val_type (sanitize_env n env) res T ->
   val_type env res T.
 Proof.
   intros. inversion H.
   - subst. econstructor. eauto.
-    destruct H1. eapply stp2_unsanitize in H1. eauto.
+    destruct H1. eapply stp2_unsanitize2 in H1. eauto.
   - subst. econstructor. eauto. eauto. eauto.
-    destruct H3. eapply stp2_unsanitize in H2. eauto.
+    destruct H3. eapply stp2_unsanitize2 in H2. eauto.
+Qed.
+
+Lemma val_type_sanitize : forall env res T n,
+  val_type env res T ->
+  val_type (sanitize_env n env) res T.
+Proof.
+  intros. inversion H.
+  - subst. econstructor. eauto.
+    destruct H1. eapply stp2_sanitize2 in H1. eauto.
+  - subst. econstructor. eauto. eauto. eauto.
+    destruct H3. eapply stp2_sanitize2 in H2. eauto.
 Qed.
 
 Lemma wf_san: forall venv0 env0 c,
@@ -2983,7 +3032,12 @@ Lemma wf_san: forall venv0 env0 c,
   wf_env (sanitize_env c venv0) (sanitize_env c env0).
 Proof.
   intros. induction H. compute. destruct c; eauto.
-  admit.
+  rewrite sanitize_commute. rewrite sanitize_commute. 
+  destruct c; destruct a; destruct c0; eapply wfe_cons; eauto.
+  eapply (val_type_sanitize _ _ _ First) in H. simpl in H. eapply H.
+  eapply (val_type_sanitize _ _ _ First) in H. simpl in H. eapply H.
+  eapply (val_type_sanitize _ _ _ First) in H. simpl in H. eapply H.
+  eapply (val_type_sanitize _ _ _ First) in H. simpl in H. eapply H.
 Qed.
 
 
