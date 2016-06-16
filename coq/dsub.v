@@ -2944,6 +2944,25 @@ Proof.
     eauto. 
 Qed.
 
+Lemma index_sanitize: forall {X} (venv0:env X) xarg a (c:class) c1 (v:X),
+  indexr xarg venv0 = Some (a, c1, v) ->
+  exists b c0, indexr xarg (sanitize_env c venv0) = Some (b, c0, v).
+Proof.
+  intros X G. induction G; intros.
+  destruct c; compute in H; inversion H.
+  destruct a as [[? ?] ?].
+  rewrite sanitize_commute.
+  assert (length (sanitize_env c G) = length G).
+  unfold sanitize_env. destruct c; try rewrite map_length; eauto.
+  case_eq (beq_nat xarg (length G)); intros E.
+  - simpl in H. rewrite E in H. inversion H. subst.
+    simpl. rewrite H0. rewrite E. 
+    destruct c; destruct a0; destruct c1; inversion H; eauto. 
+  - simpl in H. rewrite E in H. simpl. rewrite H0. rewrite E.
+    eauto. 
+Qed.
+
+
 
 Lemma invert_dapp: forall venv vf vx xarg T1 T2 c c1,
   val_type venv vf (TAll T1 c T2) ->
@@ -2984,24 +3003,44 @@ Proof.
   simpl in H24. eapply H24.
 Qed.
 
-(* ### Type Safety ### *)
-(* If term type-checks and the term evaluates without timing-out,
-   the result is not stuck, but a value.
- *)
 
+
+(* Note: the following two lemmas are admitted without 
+   formal proof. 
+
+   The formal proofs would be a bit tedious, and it is
+   clear that the lemmas must hold:
+
+   The stp2 judgement is set up in such a way that
+   all lookups ignore the boolean visibility flag
+   and the 1st/2nd class specifier.
+
+   More precisely, lookups in stp2 have only one of three 
+   forms, and in each case a and c are not otherwise bound:
+
+      indexr x G2 = Some (a, c, vty GX TX)  (* concrete env, precise type *)
+
+      indexr x G1 = Some (a, c,v)           (* concrete env, imprecise type *)
+
+      indexr x GH = Some (a, c, (GX, TX))   (* abstract env *)
+
+   Thus, changing a or c cannot change the behavior
+   of stp2. So adding or removing a call to sanitize_env
+   (which can only change a to false) cannot have any 
+   effect on stp2.
+
+   Proving this formally in Coq would take the same 
+   structure as stp2_extend and stp2_splice. 
+*)
 
 Lemma stp2_unsanitize2: forall G1 G2 H T1 T2 a b c n,
   stp2 a b G1 T1 (sanitize_env c G2) T2 H n ->
   stp2 a b G1 T1 G2 T2 H n.
 Proof. admit. Qed.
 
-Lemma stp2_sanitize1: forall G1 G2 H T1 T2 a b c n,
+Lemma stp2_sanitize: forall G1 G2 H T1 T2 a b c n,
   stp2 a b G1 T1 G2 T2 H n ->
-  stp2 a b (sanitize_env c G1) T1 G2 T2 H n.
-Proof. admit. Qed.
-
-Lemma stp2_sanitize2: forall G1 G2 H T1 T2 a b c n,
-  stp2 a b G1 T1 G2 T2 H n ->
+  stp2 a b (sanitize_env c G1) T1 G2 T2 H n /\
   stp2 a b G1 T1 (sanitize_env c G2) T2 H n.
 Proof. admit. Qed.
 
@@ -3022,9 +3061,9 @@ Lemma val_type_sanitize : forall env res T n,
 Proof.
   intros. inversion H.
   - subst. econstructor. eauto.
-    destruct H1. eapply stp2_sanitize2 in H1. eauto.
+    destruct H1. eapply stp2_sanitize in H1. ev. eauto.
   - subst. econstructor. eauto. eauto. eauto.
-    destruct H3. eapply stp2_sanitize2 in H2. eauto.
+    destruct H3. eapply stp2_sanitize in H2. ev. eauto.
 Qed.
 
 Lemma wf_san: forall venv0 env0 c,
@@ -3040,6 +3079,10 @@ Proof.
   eapply (val_type_sanitize _ _ _ First) in H. simpl in H. eapply H.
 Qed.
 
+(* ### Type Safety ### *)
+(* If term type-checks and the term evaluates without timing-out,
+   the result is not stuck, but a value.
+ *)
 
 Theorem full_safety : forall n e c tenv venv res T,
   teval n venv e c = Some res -> has_type tenv e c T -> wf_env venv tenv ->
@@ -3053,7 +3096,7 @@ Proof.
   - Case "Var".
     remember (tvar i) as e. induction H0; inversion Heqe; subst.
     + destruct (indexr_safe_ex (sanitize_env c venv0) (sanitize_env c env0) T1 i true c1) as [v [I V]]; eauto. eapply wf_san; eauto. 
-      rewrite I. eapply not_stuck. eapply val_type_sanitize. eapply V.
+      rewrite I. eapply not_stuck. eapply val_type_unsanitize. eapply V.
 
     + eapply restp_widen. eapply IHhas_type; eauto.
       eapply stpd2_upgrade. eapply stp_to_stp2; eauto.
@@ -3070,7 +3113,7 @@ Proof.
     + eapply not_stuck. eapply v_abs; eauto. eapply wf_san; eauto.
       destruct c; simpl; try rewrite map_length; eauto.
       assert (stpd2 true true venv0 (TAll t c0 T2) venv0 (TAll t c0 T2) []). eapply stp2_refl. simpl. erewrite wf_length; eauto.
-      eu. eexists. eapply stp2_sanitize1. eauto.
+      eu. eexists. eapply stp2_sanitize. eauto.
     + eapply restp_widen. eapply IHhas_type; eauto.
       eapply stpd2_upgrade. eapply stp_to_stp2; eauto.
 
