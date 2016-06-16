@@ -42,6 +42,13 @@ Inductive tm : Type :=
 | tapp : tm -> tm -> tm
 .
 
+
+(* ### Environments ### *)
+
+(* An environment is a list of bindings, where each
+   binding has a boolean flag "is-available", and
+   a 1st/2nd class identifier. *)
+
 Definition env X := list  (bool * class * X).
 
 Inductive vl : Type :=
@@ -56,8 +63,6 @@ Definition venv := env vl. (* H environment: run-time *)
 Definition aenv := env (venv*ty). (* J environment: abstract at run-time *)
 
 (* ### Representation of Bindings ### *)
-
-(* An environment is a list of values, indexed by decrementing ids. *)
 
 Fixpoint indexr {X : Type} (n : id) (l : list X) : option X :=
   match l with
