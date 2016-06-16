@@ -1953,7 +1953,7 @@ Proof.
   - Case "all - all".
     eapply stpd2_all; eauto.
     eapply stpd2_trans; eauto.
-    eapply stpd2_trans. eapply stpd2_narrow. eexists. eapply H8. eauto. eauto.
+    eapply stpd2_trans. eapply stpd2_narrow. eexists. eapply H9. eauto. eauto.
 Grab Existential Variables. apply 0.
 Qed.
 
