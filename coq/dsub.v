@@ -42,7 +42,7 @@ Inductive tm : Type :=
 | tapp : tm -> tm -> tm
 .
 
-Definition env X := list (option (class * X)).
+Definition env X := list  (bool * class * X).
 
 Inductive vl : Type :=
 (* a closure for a lambda abstraction *)
@@ -134,9 +134,9 @@ Definition sanitize_env {X} (c : class) (l: env X)  :=
     | First =>
       map (fun p =>
              match p with
-               | Some (First, x) => Some (First, x)
-               | Some (Second, x) => None
-               | None => None
+               | (true, First, x) => (true, First, x)
+               | (true, Second, x) => (false, Second, x)
+               | (false, c, x) => (false, c, x)
              end) l
     | Second => l
   end.
@@ -163,47 +163,47 @@ Inductive stp: tenv -> tenv -> ty -> ty -> Prop :=
     stp G1 GH U1 U2 ->
     stp G1 GH S2 S1 ->
     stp G1 GH (TMem S1 U1) (TMem S2 U2)
-| stp_sel1: forall G1 GH TX T2 x c,
-    indexr x G1 = Some (Some (c,TX)) ->
+| stp_sel1: forall G1 GH TX T2 x a c,
+    indexr x G1 = Some (a,c,TX) ->
     closed 0 0 (length G1) TX ->
     stp G1 GH TX (TMem TBot T2) ->
     stp G1 GH (TSel (varF x c)) T2
-| stp_sel2: forall G1 GH TX T1 x c,
-    indexr x G1 = Some (Some (c, TX)) ->
+| stp_sel2: forall G1 GH TX T1 x a c,
+    indexr x G1 = Some (a, c, TX) ->
     closed 0 0 (length G1) TX ->
     stp G1 GH TX (TMem T1 TTop) ->
     stp G1 GH T1 (TSel (varF x c))
-| stp_selx: forall G1 GH v x c,
+| stp_selx: forall G1 GH v x a c,
     (* This is a bit looser than just being able to select on TMem vars. *)
-    indexr x G1 = Some (Some (c,v)) ->
+    indexr x G1 = Some (a,c,v) ->
     stp G1 GH (TSel (varF x c)) (TSel (varF x c))
-| stp_sela1: forall G1 GH TX T2 x c,
-    indexr x GH = Some (Some (c,TX)) ->
+| stp_sela1: forall G1 GH TX T2 x a c,
+    indexr x GH = Some (a,c,TX) ->
     closed 0 x (length G1) TX ->
     stp G1 GH TX (TMem TBot T2) ->
     stp G1 GH (TSel (varH x c)) T2
-| stp_sela2: forall G1 GH TX T1 x c,
-    indexr x GH = Some (Some (c,TX)) ->
+| stp_sela2: forall G1 GH TX T1 x a c,
+    indexr x GH = Some (a,c,TX) ->
     closed 0 x (length G1) TX ->
     stp G1 GH TX (TMem T1 TTop) ->
     stp G1 GH T1 (TSel (varH x c))
-| stp_selax: forall G1 GH v x c,
+| stp_selax: forall G1 GH v x a c,
     (* This is a bit looser than just being able to select on TMem vars. *)
-    indexr x GH = Some (Some (c,v))  ->
+    indexr x GH = Some (a,c,v)  ->
     stp G1 GH (TSel (varH x c)) (TSel (varH x c))
 | stp_all: forall G1 GH T1 T2 T3 T4 x c,
     stp G1 GH T3 T1 ->
     x = length GH ->
     closed 1 (length GH) (length G1) T2 ->
     closed 1 (length GH) (length G1) T4 ->
-    stp G1 ((Some (c,T3))::GH) (open (varH x c) T2) (open (varH x c) T4) ->
+    stp G1 ((true,c,T3)::GH) (open (varH x c) T2) (open (varH x c) T4) ->
     stp G1 GH (TAll T1 c T2) (TAll T3 c T4)
 .
 
 (* ### Type Assignment ### *)
 Inductive has_type : tenv -> tm -> class -> ty -> Prop :=
 | t_var: forall x env T1 c,
-           indexr x (sanitize_env c env) = Some (Some (c,T1)) ->
+           indexr x (sanitize_env c env) = Some (true,c,T1) ->
            stp env [] T1 T1 ->
            has_type env (tvar x c) c T1
 | t_typ: forall env T1 c,
@@ -221,7 +221,7 @@ Inductive has_type : tenv -> tm -> class -> ty -> Prop :=
            closed 0 0 (length env) T ->
            has_type env (tapp f (tvar x cf)) c T
 | t_abs: forall env y T1 T2 c cf,
-           has_type ((Some (cf,T1))::env) y First (open (varF (length env) c) T2) ->
+           has_type ((true,cf,T1)::env) y First (open (varF (length env) c) T2) ->
            closed 0 0 (length env) (TAll T1 cf T2) ->
            has_type env (tabs T1 cf y) c (TAll T1 cf T2)
 | t_sub: forall env e T1 T2 c,
@@ -254,27 +254,27 @@ Inductive stp2: bool (* whether selections are precise *) ->
 (* concrete type variables *)
 (* precise/invertible bounds *)
 (* vty already marks binding as type binding, so no need for additional TMem marker *)
-| stp2_strong_sel1: forall G1 G2 GX TX x T2 GH n1 c,
-    indexr x G1 = Some (Some (c, vty GX TX)) ->
+| stp2_strong_sel1: forall G1 G2 GX TX x T2 GH n1 a c,
+    indexr x G1 = Some (a, c, vty GX TX) ->
     val_type GX (vty GX TX) (TMem TX TX) -> (* for downgrade *)
     closed 0 0 (length GX) TX ->
     stp2 true true GX TX G2 T2 GH n1 ->
     stp2 true true G1 (TSel (varF x c)) G2 T2 GH (S n1)
-| stp2_strong_sel2: forall G1 G2 GX TX x T1 GH n1 c,
-    indexr x G2 = Some (Some (c, vty GX TX)) ->
+| stp2_strong_sel2: forall G1 G2 GX TX x T1 GH n1 a c,
+    indexr x G2 = Some (a, c, vty GX TX) ->
     val_type GX (vty GX TX) (TMem TX TX) -> (* for downgrade *)
     closed 0 0 (length GX) TX ->
     stp2 true false G1 T1 GX TX GH n1 ->
     stp2 true true G1 T1 G2 (TSel (varF x c)) GH (S n1)
 (* imprecise type *)
-| stp2_sel1: forall G1 G2 v TX x T2 GH n1 c,
-    indexr x G1 = Some (Some (c,v)) ->
+| stp2_sel1: forall G1 G2 v TX x T2 GH n1 a c,
+    indexr x G1 = Some (a, c,v) ->
     val_type (base v) v TX ->
     closed 0 0 (length (base v)) TX ->
     stp2 false false (base v) TX G2 (TMem TBot T2) GH n1 ->
     stp2 false true G1 (TSel (varF x c)) G2 T2 GH (S n1)
-| stp2_sel2: forall G1 G2 v TX x T1 GH n1 c,
-    indexr x G2 = Some (Some (c,v)) ->
+| stp2_sel2: forall G1 G2 v TX x T1 GH n1 a c,
+    indexr x G2 = Some (a,c,v) ->
     val_type (base v) v TX ->
     closed 0 0 (length (base v)) TX ->
     stp2 false false (base v) TX G1 (TMem T1 TTop) GH n1 ->
@@ -285,13 +285,13 @@ Inductive stp2: bool (* whether selections are precise *) ->
     stp2 s true G1 (TSel (varF x1 c)) G2 (TSel (varF x2 c)) GH (S n)
 
 (* abstract type variables *)
-| stp2_sela1: forall G1 G2 GX TX x T2 GH n1 c,
-    indexr x GH = Some (Some (c, (GX, TX))) ->
+| stp2_sela1: forall G1 G2 GX TX x T2 GH n1 a c,
+    indexr x GH = Some (a, c, (GX, TX)) ->
     closed 0 x (length GX) TX ->
     stp2 false false GX TX G2 (TMem TBot T2) GH n1 ->
     stp2 false true G1 (TSel (varH x c)) G2 T2 GH (S n1)
-| stp2_sela2: forall G1 G2 GX T1 TX x GH n1 c,
-    indexr x GH = Some (Some (c, (GX, TX))) ->
+| stp2_sela2: forall G1 G2 GX T1 TX x GH n1 a c,
+    indexr x GH = Some (a, c, (GX, TX)) ->
     closed 0 x (length GX) TX ->
     stp2 false false GX TX G1 (TMem T1 TTop) GH n1 ->
     stp2 false true G1 T1 G2 (TSel (varH x c)) GH (S n1)
@@ -304,7 +304,7 @@ Inductive stp2: bool (* whether selections are precise *) ->
     x = length GH ->
     closed 1 (length GH) (length G1) T2 ->
     closed 1 (length GH) (length G2) T4 ->
-    stp2 false false G1 (open (varH x c) T2) G2 (open (varH x c) T4) ((Some (c, (G2, T3)))::GH) n2 ->
+    stp2 false false G1 (open (varH x c) T2) G2 (open (varH x c) T4) ((true, c, (G2, T3))::GH) n2 ->
     stp2 s true G1 (TAll T1 c T2) G2 (TAll T3 c T4) GH (S (n1 + n2))
 
 | stp2_wrapf: forall G1 G2 T1 T2 GH s n1,
@@ -319,13 +319,10 @@ Inductive stp2: bool (* whether selections are precise *) ->
 (* consistent environment *)
 with wf_env : venv -> tenv -> Prop :=
 | wfe_nil : wf_env nil nil
-| wfe_cons : forall v t vs ts c,
-    val_type ((Some (c,v))::vs) v t ->
+| wfe_cons : forall v t vs ts a c,
+    val_type ((a,c,v)::vs) v t ->
     wf_env vs ts ->
-    wf_env (cons (Some (c,v)) vs) (cons (Some (c,t)) ts)
-| wfe_dead : forall vs ts,
-    wf_env vs ts ->
-    wf_env (cons None vs) (cons None ts)
+    wf_env (cons (a,c,v) vs) (cons (a,c,t) ts)
 
 (* value type assignment *)
 with val_type : venv -> vl -> ty -> Prop :=
@@ -335,7 +332,7 @@ with val_type : venv -> vl -> ty -> Prop :=
     val_type env (vty venv T1) TE
 | v_abs: forall env venv tenv x y T1 T2 TE c,
     wf_env venv tenv ->
-    has_type ((Some (c,T1))::tenv) y First (open (varF x c) T2) ->
+    has_type ((true,c,T1)::tenv) y First (open (varF x c) T2) ->
     length venv = x ->
     (exists n, stp2 true true venv (TAll T1 c T2) env TE [] n) ->
     val_type env (vabs venv T1 c y) TE
@@ -343,12 +340,9 @@ with val_type : venv -> vl -> ty -> Prop :=
 
 Inductive wf_envh : venv -> aenv -> tenv -> Prop :=
 | wfeh_nil : forall vvs, wf_envh vvs nil nil
-| wfeh_cons : forall t vs vvs ts c,
+| wfeh_cons : forall t vs vvs ts a c,
     wf_envh vvs vs ts ->
-    wf_envh vvs (cons (Some (c,(vvs,t))) vs) (cons (Some (c,t)) ts)
-| wfeh_dead : forall vs vvs ts,
-    wf_envh vvs vs ts ->
-    wf_envh vvs (cons None vs) (cons None ts)
+    wf_envh vvs (cons (a,c,(vvs,t)) vs) (cons (a,c,t) ts)
 .
 
 Inductive valh_type : venv -> aenv -> (venv*ty) -> ty -> Prop :=
@@ -852,6 +846,7 @@ Proof.
     apply IHn; eauto.
     simpl. apply closed_open; auto using closed_inc.
     unfold open. rewrite <- open_preserves_size. omega.
+  - 
 Qed.
 
 Lemma stp_refl: forall T G GH,
