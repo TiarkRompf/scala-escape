@@ -7,6 +7,7 @@ import scala.collection.Seq
 import scala.collection.generic.CanBuildFrom
 import scala.language.{ implicitConversions, higherKinds }
 import scala.util.control.Exception
+import scala.language.reflectiveCalls
 
 import org.junit.Test
 import org.junit.Assert.assertEquals

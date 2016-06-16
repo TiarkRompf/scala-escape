@@ -8,7 +8,7 @@ class CompilerTesting {
     assert(new java.io.File(f).exists, f)
     f
   }
-  def loadPlugin = s"-Xplugin:${pluginJar}"
+  def loadPlugin = s"-Xplugin:${pluginJar} -Xexperimental"
 
   // note: `code` should have a | margin
   def escErrorMessages(msg: String, code: String) =
