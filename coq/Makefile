@@ -69,7 +69,8 @@ VFILES:=SfLib.v\
   stlc1.v\
   stlc2.v\
   stlc3.v\
-  stlc4.v
+  stlc4.v \
+  dsub.v
 
 -include $(addsuffix .d,$(VFILES))
 .SECONDARY: $(addsuffix .d,$(VFILES))
