@@ -52,3 +52,42 @@ Type safety for STLC 1/2 (Section 3.4 in the paper).
 - **Theorem**: type soundness (`full_safety`, corresponds to Theorem 3.5 in the paper)
 
 It follows that all well-typed STLC 1/2 programs are guaranteed to respect stack-based lifetimes for second-class values (Corollary 3.6 in the paper). Via the semantic equivalence, the type soundness result for STLC 1/2 extends to STLCs 1/2.
+
+
+## Coq Proofs for DSUB 1/2 ##
+
+We extend our formal model with polymorphism and subtyping in System DSUB 1/2.
+
+### File [dsub.v](dsub.v) ###
+
+This file contains our Coq development for System DSUB 1/2 (Section 4.1 in the paper).
+
+- Language syntax (types `ty`, terms `tm`, values `vl`)
+- Type Assignment (`has_type`)
+- Subtyping (static: `stp`, dynamic: `stp2`)
+- Operational semantics (`teval`)
+- **Theorem**: type soundness (`full_safety`, corresponds to Theorem 4.2 in the paper)
+
+The type system and operational semantics are as described in the paper, and set up
+like in the STLC 1/2 development.
+
+One difference is in how we treat environments: in STLC 1/2 environments were split
+into 1st and 2nd part, but here we use flat environments and add a 1st/2nd class tag
+to each element, and also a boolean flag denoting whether the element is accessible.
+
+Evaluation and type assignment remove 2nd-class items from the environment by
+turning their access flags to false. Note however, that the dynamic subtyping
+relation must ignore these flags in order to relate path-dependent types across
+environments. Since this is only an invariant used in the soundness proof and
+not part of the operational semantics, this is not a safety concern. 
+
+The type soundness result shows that the type system correctly predicts the runtime
+checks by the evaluator, which are the same as in STLC 1/2. It would be easy, 
+but not very insightful, to redo the formal proof of semantic equivalence 
+with a stack-based evaluator, as we have done for STLCs 1/2.
+
+
+
+
+
+
