@@ -540,9 +540,9 @@ Fixpoint splice n (T : ty) {struct T} : ty :=
     | TMem T1 T2      => TMem (splice n T1) (splice n T2)
   end.
 
-Definition spliceat n (V: (venv*ty)) :=
+Definition spliceat n (V: (bool*class*(venv*ty))) :=
   match V with
-    | (G,T) => (G,splice n T)
+    | (a,c,(G,T)) => (a,c,(G,splice n T))
   end.
 
 Definition spliceb n (V: (bool*class*ty)) :=
@@ -590,11 +590,11 @@ Proof.
     + rewrite E in H.  eapply IHG2 in H. eapply indexr_extend. eapply H. eauto.
 Qed.
 
-Lemma indexr_spliceat_hi: forall G0 G2 x0 v1 G T,
-    indexr x0 (G2 ++ G0) = Some (G, T) ->
+Lemma indexr_spliceat_hi: forall G0 G2 x0 v1 G T a c,
+    indexr x0 (G2 ++ G0) = Some (a,c,(G, T)) ->
     length G0 <= x0 ->
     indexr (x0 + 1) (map (spliceat (length G0)) G2 ++ v1 :: G0) =
-    Some (G, splice (length G0) T).
+    Some (a,c,(G, splice (length G0) T)).
 Proof.
   intros G0 G2. induction G2; intros.
   - eapply indexr_max in H. simpl in H. omega.
@@ -1090,12 +1090,12 @@ Proof.
     eapply IHstp2. eauto.
 Qed.
 
-Lemma stp2_splice : forall G1 T1 G2 T2 GH1 GH0 v1 s m n,
+Lemma stp2_splice : forall G1 T1 G2 T2 GH1 GH0 v1 s m n a c,
    stp2 s m G1 T1 G2 T2 (GH1++GH0) n ->
    stp2 s m G1 (splice (length GH0) T1) G2 (splice (length GH0) T2)
-        ((map (spliceat (length GH0)) GH1) ++ v1::GH0) n.
+        ((map (spliceat (length GH0)) GH1) ++ (a,c,v1)::GH0) n.
 Proof.
-  intros G1 T1 G2 T2 GH1 GH0 v1 s m n H. remember (GH1++GH0) as GH.
+  intros G1 T1 G2 T2 GH1 GH0 v1 s m n a c H. remember (GH1++GH0) as GH.
   revert GH0 GH1 HeqGH.
   induction H; intros; subst GH; simpl; eauto.
   - Case "top".
@@ -1160,9 +1160,9 @@ Proof.
       rewrite <- A. eapply IHstp2. eauto.
   - Case "selax".
     case_eq (le_lt_dec (length GH0) x); intros E LE.
-    + destruct v. eapply stp2_selax.
+    + destruct v as [[? ?] [? ?]]. eapply stp2_selax.
       eapply indexr_spliceat_hi. apply H. eauto.
-    + destruct v. eapply stp2_selax.
+    + destruct v as [[? ?] [? ?]]. eapply stp2_selax.
       eapply indexr_spliceat_lo. apply H. eauto.
   - Case "all".
     apply stp2_all with (x:= length GH1 + S (length GH0)).
@@ -1173,7 +1173,7 @@ Proof.
     simpl. rewrite map_spliceat_length_inc. apply closed_splice. assumption.
 
     subst x.
-    specialize IHstp2_2 with (GH2:=GH0) (GH3:=(G2, T3) :: GH1).
+    specialize IHstp2_2 with (GH2:=GH0) (GH3:=(true,c0,(G2, T3)) :: GH1).
     simpl in IHstp2_2.
     repeat rewrite splice_open_permute with (j:=0).
     rewrite app_length in IHstp2_2.
