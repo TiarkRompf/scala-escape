@@ -132,6 +132,24 @@ Proof.
     apply le_S_n in H. apply IHn. assumption.
 Qed.
 
+Theorem false_beq_nat : forall n m : nat,
+     n <> m ->
+     beq_nat n m = false.
+Proof.
+  intros. generalize dependent m.
+  induction n;
+    intros;
+      unfold not in H;
+        destruct m;
+          simpl.
+  destruct H. reflexivity.
+  reflexivity.
+  reflexivity.
+  apply IHn. unfold not.
+  intros H'. apply H.
+  rewrite H'. reflexivity.
+Qed.
+
 Inductive appears_in (n : nat) : list nat -> Prop :=
 | ai_here : forall l, appears_in n (n::l)
 | ai_later : forall m l, appears_in n l -> appears_in n (m::l).
