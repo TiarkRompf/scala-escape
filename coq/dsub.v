@@ -1195,8 +1195,8 @@ Proof.
   assert (splice (length GH) T3 = T3) as A3. {
     eapply closed_splice_idem. eauto. omega.
   }
-  assert (map (splice (length GH)) [T3] ++ v1::GH =
-          (T3::v1::GH)) as HGX3. {
+  assert (map (spliceb (length GH)) [(true,c,T3)] ++ v1::GH =
+          ((true,c,T3)::v1::GH)) as HGX3. {
     simpl. rewrite A3. eauto.
   }
   apply stp_all with (x:=length (v1 :: GH)).
@@ -1209,7 +1209,7 @@ Proof.
   unfold open.
   change (varH (S (length GH))) with (varH (0 + (S (length GH)))).
   rewrite -> splice_open_permute. rewrite -> splice_open_permute.
-  rewrite <- HGX3.
+  rewrite <- HGX3. destruct v1. destruct p.
   apply stp_splice.
   simpl. unfold open in H3. rewrite <- H0. apply H3.
 Qed.
@@ -1260,15 +1260,15 @@ Inductive venv_ext : venv -> venv -> Prop :=
 Inductive aenv_ext : aenv -> aenv -> Prop :=
 | aenv_ext_nil : aenv_ext nil nil
 | aenv_ext_cons :
-    forall T G' G A A',
+    forall T G' G A A' a c,
       aenv_ext A' A -> venv_ext G' G ->
-      aenv_ext ((G',T)::A') ((G,T)::A).
+      aenv_ext ((a,c,(G',T))::A') ((a,c,(G,T))::A).
 
 Lemma aenv_ext_refl: forall GH, aenv_ext GH GH.
 Proof.
   intros. induction GH.
   - apply aenv_ext_nil.
-  - destruct a. apply aenv_ext_cons.
+  - destruct a as [[? ?][? ?]]. apply aenv_ext_cons.
     assumption.
     apply venv_ext_refl.
 Qed.
@@ -1308,18 +1308,18 @@ Proof.
     simpl in H1. inversion H1.
     specialize (IHaenv_ext GL GU H4).
     destruct IHaenv_ext as [GU' [GL' [IHA [IHU IHL]]]].
-    exists ((G', T)::GU'). exists GL'.
+    exists ((a,c,(G', T))::GU'). exists GL'.
     split. simpl. rewrite IHA. reflexivity.
     split. apply aenv_ext_cons. apply IHU. assumption. apply IHL.
 Qed.
 
 Lemma indexr_at_ext :
-  forall GH GH' x T G,
+  forall GH GH' x T G a c,
     aenv_ext GH' GH ->
-    indexr x GH = Some (G, T) ->
-    exists G', indexr x GH' = Some (G', T) /\ venv_ext G' G.
+    indexr x GH = Some (a,c,(G, T)) ->
+    exists G', indexr x GH' = Some (a,c,(G', T)) /\ venv_ext G' G.
 Proof.
-  intros GH GH' x T G Hext Hindex. induction Hext.
+  intros GH GH' x T G a c Hext Hindex. induction Hext.
   - simpl in Hindex. inversion Hindex.
   - simpl. simpl in Hindex.
     case_eq (beq_nat x (length A)); intros E.
@@ -1384,32 +1384,32 @@ Proof.
     eapply indexr_extend_venv. apply H. assumption.
     eapply indexr_extend_venv. apply H0. assumption.
   - Case "sela1".
-    assert (exists GX', indexr x GH' = Some (GX', TX) /\ venv_ext GX' GX) as A. {
+    assert (exists GX', indexr x GH' = Some (a,c,(GX', TX)) /\ venv_ext GX' GX) as A. {
       apply indexr_at_ext with (GH:=GH); assumption.
     }
     inversion A as [GX' [H' HX]].
-    apply stp2_sela1 with (GX:=GX') (TX:=TX).
+    apply stp2_sela1 with (GX:=GX') (TX:=TX) (a:=a) (c:=c).
     assumption.
     eapply closed_inc_mult; try eassumption; try omega.
     apply venv_ext__ge_length. assumption.
     apply IHstp2; assumption.
   - Case "sela2".
-    assert (exists GX', indexr x GH' = Some (GX', TX) /\ venv_ext GX' GX) as A. {
+    assert (exists GX', indexr x GH' = Some (a,c,(GX', TX)) /\ venv_ext GX' GX) as A. {
       apply indexr_at_ext with (GH:=GH); assumption.
     }
     inversion A as [GX' [H' HX]].
-    apply stp2_sela2 with (GX:=GX') (TX:=TX).
+    apply stp2_sela2 with (GX:=GX') (TX:=TX) (a:=a) (c:=c).
     assumption.
     eapply closed_inc_mult; try eassumption; try omega.
     apply venv_ext__ge_length. assumption.
     apply IHstp2; assumption.
   - Case "selax".
-    destruct v as [GX TX].
-    assert (exists GX', indexr x GH' = Some (GX', TX) /\ venv_ext GX' GX) as A. {
+    destruct v as [[a c] [GX TX]].
+    assert (exists GX', indexr x GH' = Some (a,c,(GX', TX)) /\ venv_ext GX' GX) as A. {
       apply indexr_at_ext with (GH:=GH); assumption.
     }
     inversion A as [GX' [H' HX]].
-    apply stp2_selax with (v:=(GX',TX)).
+    apply stp2_selax with (v:=(a,c,(GX',TX))).
     assumption.
   - Case "all".
     eapply stp2_all with (x:=length GH').
@@ -1432,9 +1432,9 @@ Proof.
     assumption. apply venv_ext_refl. assumption.
 Qed.
 
-Lemma stp2_closure_extend : forall G1 T1 G2 T2 GH GX T v s m n,
-                              stp2 s m G1 T1 G2 T2 ((GX,T)::GH) n ->
-                              stp2 s m G1 T1 G2 T2 ((v::GX,T)::GH) n.
+Lemma stp2_closure_extend : forall G1 T1 G2 T2 GH GX T v s m n a c,
+                              stp2 s m G1 T1 G2 T2 ((a,c,(GX,T))::GH) n ->
+                              stp2 s m G1 T1 G2 T2 ((a,c,(v::GX,T))::GH) n.
 Proof.
   intros. eapply stp2_closure_extend_rec. apply H.
   apply aenv_ext_cons. apply aenv_ext_refl. apply venv_ext_cons.
@@ -1491,8 +1491,8 @@ Proof.
   assert (splice (length GH) T3 = T3) as A3. {
     eapply closed_splice_idem. eauto. omega.
   }
-  assert (map (spliceat (length GH)) [(G2, T3)] ++ v1::GH =
-          ((G2, T3)::v1::GH)) as HGX3. {
+  assert (map (spliceat (length GH)) [(true,c,(G2, T3))] ++ v1::GH =
+          ((true,c,(G2, T3))::v1::GH)) as HGX3. {
     simpl. rewrite A3. eauto.
   }
   eapply stp2_all.
@@ -1507,6 +1507,7 @@ Proof.
   rewrite -> splice_open_permute.
   rewrite -> splice_open_permute.
   rewrite <- HGX3.
+  destruct v1 as [[? ?][? ?]].
   apply stp2_splice.
   subst x. simpl. unfold open in H3. apply H3.
 Qed.
@@ -1631,10 +1632,10 @@ Proof.
   intros. induction H; eauto; econstructor; eauto; eapply stpd2_extend2; eauto.
 Qed.
 
-Lemma indexr_safe_ex: forall H1 G1 TF i,
+Lemma indexr_safe_ex: forall H1 G1 TF i a c,
              wf_env H1 G1 ->
-             indexr i G1 = Some TF ->
-             exists v, indexr i H1 = Some v /\ val_type H1 v TF.
+             indexr i G1 = Some (a,c,TF) ->
+             exists v, indexr i H1 = Some (a,c,v) /\ val_type H1 v TF.
 Proof. intros. induction H.
    - Case "nil". inversion H0.
    - Case "cons". inversion H0.
@@ -1647,16 +1648,16 @@ Proof. intros. induction H.
      * SSCase "miss".
        rewrite E2 in H3.
        assert (exists v0,
-                 indexr i vs = Some v0 /\ val_type vs v0 TF). eauto.
+                 indexr i vs = Some (a,c,v0) /\ val_type vs v0 TF). eauto.
        destruct H2. destruct H2.
        eexists. split. eapply indexr_extend. eauto.
        eapply valtp_extend. assumption.
 Qed.
 
-Lemma index_safeh_ex: forall H1 H2 G1 GH TF i,
+Lemma index_safeh_ex: forall H1 H2 G1 GH TF i a c,
              wf_env H1 G1 -> wf_envh H1 H2 GH ->
-             indexr i GH = Some TF ->
-             exists v, indexr i H2 = Some v /\ valh_type H1 H2 v TF.
+             indexr i GH = Some (a,c,TF) ->
+             exists v, indexr i H2 = Some (a,c,v) /\ valh_type H1 H2 v TF.
 Proof. intros. induction H0.
    - Case "nil". inversion H3.
    - Case "cons". inversion H3.
@@ -1669,7 +1670,7 @@ Proof. intros. induction H0.
      * SSCase "miss".
        rewrite E2 in H2.
        assert (exists v : venv * ty,
-                 indexr i vs = Some v /\ valh_type vvs vs v TF). eauto.
+                 indexr i vs = Some (a,c,v) /\ valh_type vvs vs v TF). eauto.
        destruct H1. destruct H1.
        eexists. split. eapply indexr_extend. eauto.
        inversion H4. subst.
@@ -1699,29 +1700,29 @@ Lemma stpd2_mem: forall G1 G2 S1 U1 S2 U2 GH s,
     stpd2 s false G2 S2 G1 S1 GH ->
     stpd2 s true G1 (TMem S1 U1) G2 (TMem S2 U2) GH.
 Proof. intros. repeat eu. eauto. Qed.
-Lemma stpd2_strong_sel1: forall G1 G2 GX TX x T2 GH,
-    indexr x G1 = Some (vty GX TX) ->
+Lemma stpd2_strong_sel1: forall G1 G2 GX TX x T2 GH a c,
+    indexr x G1 = Some (a,c,(vty GX TX)) ->
     val_type GX (vty GX TX) (TMem TX TX) -> (* for downgrade *)
     closed 0 0 (length GX) TX ->
     stpd2 true true GX TX G2 T2 GH ->
     stpd2 true true G1 (TSel (varF x)) G2 T2 GH.
 Proof. intros. repeat eu. eauto. Qed.
-Lemma stpd2_strong_sel2: forall G1 G2 GX TX x T1 GH,
-    indexr x G2 = Some (vty GX TX) ->
+Lemma stpd2_strong_sel2: forall G1 G2 GX TX x T1 GH a c,
+    indexr x G2 = Some (a,c,(vty GX TX)) ->
     val_type GX (vty GX TX) (TMem TX TX) -> (* for downgrade *)
     closed 0 0 (length GX) TX ->
     stpd2 true false G1 T1 GX TX GH ->
     stpd2 true true G1 T1 G2 (TSel (varF x)) GH.
 Proof. intros. repeat eu. eauto. Qed.
-Lemma stpd2_sel1: forall G1 G2 v TX x T2 GH,
-    indexr x G1 = Some v ->
+Lemma stpd2_sel1: forall G1 G2 v TX x T2 GH a c,
+    indexr x G1 = Some (a,c,v) ->
     val_type (base v) v TX ->
     closed 0 0 (length (base v)) TX ->
     stpd2 false false (base v) TX G2 (TMem TBot T2) GH ->
     stpd2 false true G1 (TSel (varF x)) G2 T2 GH.
 Proof. intros. repeat eu. eauto. Qed.
-Lemma stpd2_sel2: forall G1 G2 v TX x T1 GH,
-    indexr x G2 = Some v ->
+Lemma stpd2_sel2: forall G1 G2 v TX x T1 GH a c,
+    indexr x G2 = Some (a,c,v) ->
     val_type (base v) v TX ->
     closed 0 0 (length (base v)) TX ->
     stpd2 false false (base v) TX G1 (TMem T1 TTop) GH ->
@@ -1732,14 +1733,14 @@ Lemma stpd2_selx: forall G1 G2 v x1 x2 GH s,
     indexr x2 G2 = Some v ->
     stpd2 s true G1 (TSel (varF x1)) G2 (TSel (varF x2)) GH.
 Proof. intros. exists (S 0). eauto. Qed.
-Lemma stpd2_sela1: forall G1 G2 GX TX x T2 GH,
-    indexr x GH = Some (GX, TX) ->
+Lemma stpd2_sela1: forall G1 G2 GX TX x T2 GH a c,
+    indexr x GH = Some (a,c,(GX, TX)) ->
     closed 0 x (length GX) TX ->
     stpd2 false false GX TX G2 (TMem TBot T2) GH ->
     stpd2 false true G1 (TSel (varH x)) G2 T2 GH.
 Proof. intros. repeat eu. eauto. Qed.
-Lemma stpd2_sela2: forall G1 G2 GX T1 TX x GH,
-    indexr x GH = Some (GX, TX) ->
+Lemma stpd2_sela2: forall G1 G2 GX T1 TX x GH a c,
+    indexr x GH = Some (a,c,(GX, TX)) ->
     closed 0 x (length GX) TX ->
     stpd2 false false GX TX G1 (TMem T1 TTop) GH ->
     stpd2 false true G1 T1 G2 (TSel (varH x)) GH.
@@ -1748,13 +1749,13 @@ Lemma stpd2_selax: forall G1 G2 v x GH s,
     indexr x GH = Some v ->
     stpd2 s true G1 (TSel (varH x)) G2 (TSel (varH x)) GH.
 Proof. intros. exists (S 0). eauto. Qed.
-Lemma stpd2_all: forall G1 G2 T1 T2 T3 T4 x GH s,
+Lemma stpd2_all: forall G1 G2 T1 T2 T3 T4 x GH s c,
     stpd2 false false G2 T3 G1 T1 GH ->
     x = length GH ->
     closed 1 (length GH) (length G1) T2 ->
     closed 1 (length GH) (length G2) T4 ->
-    stpd2 false false G1 (open (varH x) T2) G2 (open (varH x) T4) ((G2, T3)::GH) ->
-    stpd2 s true G1 (TAll T1 T2) G2 (TAll T3 T4) GH.
+    stpd2 false false G1 (open (varH x) T2) G2 (open (varH x) T4) ((true,c,(G2, T3))::GH) ->
+    stpd2 s true G1 (TAll T1 c T2) G2 (TAll T3 c T4) GH.
 Proof. intros. repeat eu. eauto. Qed.
 Lemma stpd2_wrapf: forall G1 G2 T1 T2 GH s,
     stpd2 s true G1 T1 G2 T2 GH ->
