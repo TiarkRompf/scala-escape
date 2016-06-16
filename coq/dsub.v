@@ -15,9 +15,9 @@ Inductive class : Type :=
 
 (* term variables occurring in types *)
 Inductive var : Type :=
-| varF : id -> class -> var (* free, in concrete environment *)
-| varH : id -> class -> var (* free, in abstract environment  *)
-| varB : id -> class -> var (* locally-bound variable *)
+| varF : id -> var (* free, in concrete environment *)
+| varH : id -> var (* free, in abstract environment  *)
+| varB : id -> var (* locally-bound variable *)
 .
 
 Inductive ty : Type :=
@@ -33,7 +33,7 @@ Inductive ty : Type :=
 
 Inductive tm : Type :=
 (* x -- free variable, matching concrete environment *)
-| tvar : id -> class -> tm
+| tvar : id -> tm
 (* { Type = T } *)
 | ttyp : ty -> tm
 (* lambda x:T.t *)
@@ -75,15 +75,15 @@ Inductive closed: nat(*B*) -> nat(*H*) -> nat(*F*) -> ty -> Prop :=
     closed i j k T1 ->
     closed (S i) j k T2 ->
     closed i j k (TAll T1 c T2)
-| cl_sel: forall i j k x c,
+| cl_sel: forall i j k x,
     k > x ->
-    closed i j k (TSel (varF x c))
-| cl_selh: forall i j k x c,
+    closed i j k (TSel (varF x))
+| cl_selh: forall i j k x,
     j > x ->
-    closed i j k (TSel (varH x c))
-| cl_selb: forall i j k x c,
+    closed i j k (TSel (varH x))
+| cl_selb: forall i j k x,
     i > x ->
-    closed i j k (TSel (varB x c))
+    closed i j k (TSel (varB x))
 | cl_mem: forall i j k T1 T2,
     closed i j k T1 ->
     closed i j k T2 ->
@@ -97,9 +97,9 @@ Fixpoint open_rec (k: nat) (u: var) (T: ty) { struct T }: ty :=
     | TTop            => TTop
     | TBot            => TBot
     | TAll T1 c T2    => TAll (open_rec k u T1) c (open_rec (S k) u T2)
-    | TSel (varF x c) => TSel (varF x c)
-    | TSel (varH i c) => TSel (varH i c)
-    | TSel (varB i c) => if beq_nat k i then TSel u else TSel (varB i c)
+    | TSel (varF x) => TSel (varF x)
+    | TSel (varH i) => TSel (varH i)
+    | TSel (varB i) => if beq_nat k i then TSel u else TSel (varB i)
     | TMem T1 T2      => TMem (open_rec k u T1) (open_rec k u T2)
   end.
 
@@ -111,9 +111,9 @@ Fixpoint subst (U : var) (T : ty) {struct T} : ty :=
     | TTop            => TTop
     | TBot            => TBot
     | TAll T1 c T2    => TAll (subst U T1) c (subst U T2)
-    | TSel (varB i c) => TSel (varB i c)
-    | TSel (varF i c) => TSel (varF i c)
-    | TSel (varH i c) => if beq_nat i 0 then TSel U else TSel (varH (i-1) c)
+    | TSel (varB i) => TSel (varB i)
+    | TSel (varF i) => TSel (varF i)
+    | TSel (varH i) => if beq_nat i 0 then TSel U else TSel (varH (i-1))
     | TMem T1 T2      => TMem (subst U T1) (subst U T2)
   end.
 
@@ -122,9 +122,9 @@ Fixpoint nosubst (T : ty) {struct T} : Prop :=
     | TTop            => True
     | TBot            => True
     | TAll T1 c T2    => nosubst T1 /\ nosubst T2
-    | TSel (varB i c) => True
-    | TSel (varF i c) => True
-    | TSel (varH i c) => i <> 0
+    | TSel (varB i) => True
+    | TSel (varF i) => True
+    | TSel (varH i) => i <> 0
     | TMem T1 T2    => nosubst T1 /\ nosubst T2
   end.
 
@@ -167,45 +167,45 @@ Inductive stp: tenv -> tenv -> ty -> ty -> Prop :=
     indexr x G1 = Some (a,c,TX) ->
     closed 0 0 (length G1) TX ->
     stp G1 GH TX (TMem TBot T2) ->
-    stp G1 GH (TSel (varF x c)) T2
+    stp G1 GH (TSel (varF x)) T2
 | stp_sel2: forall G1 GH TX T1 x a c,
     indexr x G1 = Some (a, c, TX) ->
     closed 0 0 (length G1) TX ->
     stp G1 GH TX (TMem T1 TTop) ->
-    stp G1 GH T1 (TSel (varF x c))
+    stp G1 GH T1 (TSel (varF x))
 | stp_selx: forall G1 GH v x a c,
     (* This is a bit looser than just being able to select on TMem vars. *)
     indexr x G1 = Some (a,c,v) ->
-    stp G1 GH (TSel (varF x c)) (TSel (varF x c))
+    stp G1 GH (TSel (varF x)) (TSel (varF x))
 | stp_sela1: forall G1 GH TX T2 x a c,
     indexr x GH = Some (a,c,TX) ->
     closed 0 x (length G1) TX ->
     stp G1 GH TX (TMem TBot T2) ->
-    stp G1 GH (TSel (varH x c)) T2
+    stp G1 GH (TSel (varH x)) T2
 | stp_sela2: forall G1 GH TX T1 x a c,
     indexr x GH = Some (a,c,TX) ->
     closed 0 x (length G1) TX ->
     stp G1 GH TX (TMem T1 TTop) ->
-    stp G1 GH T1 (TSel (varH x c))
+    stp G1 GH T1 (TSel (varH x))
 | stp_selax: forall G1 GH v x a c,
     (* This is a bit looser than just being able to select on TMem vars. *)
     indexr x GH = Some (a,c,v)  ->
-    stp G1 GH (TSel (varH x c)) (TSel (varH x c))
+    stp G1 GH (TSel (varH x)) (TSel (varH x))
 | stp_all: forall G1 GH T1 T2 T3 T4 x c,
     stp G1 GH T3 T1 ->
     x = length GH ->
     closed 1 (length GH) (length G1) T2 ->
     closed 1 (length GH) (length G1) T4 ->
-    stp G1 ((true,c,T3)::GH) (open (varH x c) T2) (open (varH x c) T4) ->
+    stp G1 ((true,c,T3)::GH) (open (varH x) T2) (open (varH x) T4) ->
     stp G1 GH (TAll T1 c T2) (TAll T3 c T4)
 .
 
 (* ### Type Assignment ### *)
 Inductive has_type : tenv -> tm -> class -> ty -> Prop :=
-| t_var: forall x env T1 c,
-           indexr x (sanitize_env c env) = Some (true,c,T1) ->
+| t_var: forall x env T1 c c1,
+           indexr x (sanitize_env c env) = Some (true,c1,T1) ->
            stp env [] T1 T1 ->
-           has_type env (tvar x c) c T1
+           has_type env (tvar x) c T1
 | t_typ: forall env T1 c,
            closed 0 0 (length env) T1 ->
            has_type env (ttyp T1) c (TMem T1 T1)
@@ -216,12 +216,12 @@ Inductive has_type : tenv -> tm -> class -> ty -> Prop :=
            has_type env (tapp f x) c T2
 | t_dapp:forall env f x T1 T2 T c cf,
            has_type env f Second (TAll T1 cf T2) ->
-           has_type env (tvar x cf) cf T1 ->
-           T = open (varF x cf) T2 ->
+           has_type env (tvar x) cf T1 ->
+           T = open (varF x) T2 ->
            closed 0 0 (length env) T ->
-           has_type env (tapp f (tvar x cf)) c T
+           has_type env (tapp f (tvar x)) c T
 | t_abs: forall env y T1 T2 c cf,
-           has_type ((true,cf,T1)::env) y First (open (varF (length env) c) T2) ->
+           has_type ((true,cf,T1)::env) y First (open (varF (length env)) T2) ->
            closed 0 0 (length env) (TAll T1 cf T2) ->
            has_type env (tabs T1 cf y) c (TAll T1 cf T2)
 | t_sub: forall env e T1 T2 c,
@@ -246,6 +246,9 @@ Inductive stp2: bool (* whether selections are precise *) ->
 | stp2_top: forall G1 G2 GH T s n,
     closed 0 (length GH) (length G1) T ->
     stp2 s true G1 T G2 TTop GH (S n)
+| stp2_bot: forall G1 G2 GH T s n,
+    closed 0 (length GH) (length G2) T ->
+    stp2 s true G1 TBot G2 T GH (S n)
 | stp2_mem: forall G1 G2 S1 U1 S2 U2 GH s n1 n2,
     stp2 s s G1 U1 G2 U2 GH n1 ->
     stp2 s false G2 S2 G1 S1 GH n2 ->
@@ -259,52 +262,52 @@ Inductive stp2: bool (* whether selections are precise *) ->
     val_type GX (vty GX TX) (TMem TX TX) -> (* for downgrade *)
     closed 0 0 (length GX) TX ->
     stp2 true true GX TX G2 T2 GH n1 ->
-    stp2 true true G1 (TSel (varF x c)) G2 T2 GH (S n1)
+    stp2 true true G1 (TSel (varF x)) G2 T2 GH (S n1)
 | stp2_strong_sel2: forall G1 G2 GX TX x T1 GH n1 a c,
     indexr x G2 = Some (a, c, vty GX TX) ->
     val_type GX (vty GX TX) (TMem TX TX) -> (* for downgrade *)
     closed 0 0 (length GX) TX ->
     stp2 true false G1 T1 GX TX GH n1 ->
-    stp2 true true G1 T1 G2 (TSel (varF x c)) GH (S n1)
+    stp2 true true G1 T1 G2 (TSel (varF x)) GH (S n1)
 (* imprecise type *)
 | stp2_sel1: forall G1 G2 v TX x T2 GH n1 a c,
     indexr x G1 = Some (a, c,v) ->
     val_type (base v) v TX ->
     closed 0 0 (length (base v)) TX ->
     stp2 false false (base v) TX G2 (TMem TBot T2) GH n1 ->
-    stp2 false true G1 (TSel (varF x c)) G2 T2 GH (S n1)
+    stp2 false true G1 (TSel (varF x)) G2 T2 GH (S n1)
 | stp2_sel2: forall G1 G2 v TX x T1 GH n1 a c,
     indexr x G2 = Some (a,c,v) ->
     val_type (base v) v TX ->
     closed 0 0 (length (base v)) TX ->
     stp2 false false (base v) TX G1 (TMem T1 TTop) GH n1 ->
-    stp2 false true G1 T1 G2 (TSel (varF x c)) GH (S n1)
-| stp2_selx: forall G1 G2 v x1 x2 GH s n c,
+    stp2 false true G1 T1 G2 (TSel (varF x)) GH (S n1)
+| stp2_selx: forall G1 G2 v x1 x2 GH s n,
     indexr x1 G1 = Some v ->
     indexr x2 G2 = Some v ->
-    stp2 s true G1 (TSel (varF x1 c)) G2 (TSel (varF x2 c)) GH (S n)
+    stp2 s true G1 (TSel (varF x1)) G2 (TSel (varF x2)) GH (S n)
 
 (* abstract type variables *)
 | stp2_sela1: forall G1 G2 GX TX x T2 GH n1 a c,
     indexr x GH = Some (a, c, (GX, TX)) ->
     closed 0 x (length GX) TX ->
     stp2 false false GX TX G2 (TMem TBot T2) GH n1 ->
-    stp2 false true G1 (TSel (varH x c)) G2 T2 GH (S n1)
+    stp2 false true G1 (TSel (varH x)) G2 T2 GH (S n1)
 | stp2_sela2: forall G1 G2 GX T1 TX x GH n1 a c,
     indexr x GH = Some (a, c, (GX, TX)) ->
     closed 0 x (length GX) TX ->
     stp2 false false GX TX G1 (TMem T1 TTop) GH n1 ->
-    stp2 false true G1 T1 G2 (TSel (varH x c)) GH (S n1)
-| stp2_selax: forall G1 G2 v x GH s n c,
+    stp2 false true G1 T1 G2 (TSel (varH x)) GH (S n1)
+| stp2_selax: forall G1 G2 v x GH s n,
     indexr x GH = Some v ->
-    stp2 s true G1 (TSel (varH x c)) G2 (TSel (varH x c)) GH (S n)
+    stp2 s true G1 (TSel (varH x)) G2 (TSel (varH x)) GH (S n)
 
 | stp2_all: forall G1 G2 T1 T2 T3 T4 x GH s n1 n2 c,
     stp2 false false G2 T3 G1 T1 GH n1 ->
     x = length GH ->
     closed 1 (length GH) (length G1) T2 ->
     closed 1 (length GH) (length G2) T4 ->
-    stp2 false false G1 (open (varH x c) T2) G2 (open (varH x c) T4) ((true, c, (G2, T3))::GH) n2 ->
+    stp2 false false G1 (open (varH x) T2) G2 (open (varH x) T4) ((true, c, (G2, T3))::GH) n2 ->
     stp2 s true G1 (TAll T1 c T2) G2 (TAll T3 c T4) GH (S (n1 + n2))
 
 | stp2_wrapf: forall G1 G2 T1 T2 GH s n1,
@@ -332,7 +335,7 @@ with val_type : venv -> vl -> ty -> Prop :=
     val_type env (vty venv T1) TE
 | v_abs: forall env venv tenv x y T1 T2 TE c,
     wf_env venv tenv ->
-    has_type ((true,c,T1)::tenv) y First (open (varF x c) T2) ->
+    has_type ((true,c,T1)::tenv) y First (open (varF x) T2) ->
     length venv = x ->
     (exists n, stp2 true true venv (TAll T1 c T2) env TE [] n) ->
     val_type env (vabs venv T1 c y) TE
@@ -365,8 +368,8 @@ Fixpoint teval(n: nat)(env: venv)(t: tm)(ct: class){struct n}: option (option vl
     | 0 => None
     | S n =>
       match t with
-        | tvar x c     => Some (match indexr x (sanitize_env ct env) with
-                                  | Some (Some (c,x)) => Some x
+        | tvar x       => Some (match indexr x (sanitize_env ct env) with
+                                  | Some (true,_,x) => Some x
                                   | _ => None
                                 end)
         | ttyp T       => Some (Some (vty env T))
@@ -381,7 +384,7 @@ Fixpoint teval(n: nat)(env: venv)(t: tm)(ct: class){struct n}: option (option vl
                 | None => None
                 | Some None => Some None
                 | Some (Some vx) =>
-                  teval n ((Some (c,vx))::env2) ey First
+                  teval n ((true,c,vx)::env2) ey First
               end
           end
       end
@@ -425,19 +428,19 @@ Ltac crush :=
 
 (* define polymorphic identity function *)
 
-Definition polyId := TAll (TMem TBot TTop) First (TAll (TSel (varB 0 First)) First (TSel (varB 1 First))).
+Definition polyId := TAll (TMem TBot TTop) First (TAll (TSel (varB 0)) First (TSel (varB 1))).
 
-Example ex1: has_type [] (tabs (TMem TBot TTop) First (tabs (TSel (varF 0 First)) First (tvar 1 First))) First polyId.
+Example ex1: has_type [] (tabs (TMem TBot TTop) First (tabs (TSel (varF 0)) First (tvar 1 ))) First polyId.
 Proof.
   crush.
 Qed.
 
 (* instantiate it to TTop *)
-(* FIXME: example 
-Example ex2: has_type [Some (First,polyId)] (tapp (tvar 0 First) (ttyp TTop)) First (TAll TTop First TTop).
+(* FIXME: example *)
+Example ex2: has_type [(true,First,polyId)] (tapp (tvar 0) (ttyp TTop)) First (TAll TTop First TTop).
 Proof.
   crush.
-Qed.*)
+Qed.
 
 (* ############################################################ *)
 (* Proofs *)
@@ -449,11 +452,11 @@ Fixpoint tsize(T: ty) :=
     | TBot => 1
     | TAll T1 c T2 => S (tsize T1 + tsize T2)
     | TSel _ => 1
-    | TMem _ T0 => S (tsize T0)
+    | TMem T1 T2 => S (tsize T1 + tsize T2)
   end.
 
-Lemma open_preserves_size: forall T x j c,
-  tsize T = tsize (open_rec j (varH x c) T).
+Lemma open_preserves_size: forall T x j,
+  tsize T = tsize (open_rec j (varH x) T).
 Proof.
   intros T. induction T; intros; simpl; eauto.
   - destruct v; simpl; destruct (beq_nat j i); eauto.
@@ -466,7 +469,7 @@ Lemma wf_length : forall vs ts,
                     (length vs = length ts).
 Proof.
   intros. induction H. auto.
-  compute. eauto. compute. eauto. 
+  compute. eauto. 
 Qed.
 
 Hint Immediate wf_length.
@@ -476,7 +479,7 @@ Lemma wfh_length : forall vvs vs ts,
                     (length vs = length ts).
 Proof.
   intros. induction H. auto.
-  compute. eauto. compute. eauto. 
+  compute. eauto. 
 Qed.
 
 Hint Immediate wfh_length.
@@ -531,9 +534,9 @@ Fixpoint splice n (T : ty) {struct T} : ty :=
     | TTop         => TTop
     | TBot         => TBot
     | TAll T1 c T2   => TAll (splice n T1) c (splice n T2)
-    | TSel (varF i c) => TSel (varF i c)
-    | TSel (varB i c) => TSel (varB i c)
-    | TSel (varH i c) => if le_lt_dec n i then TSel (varH (i+1) c) else TSel (varH i c)
+    | TSel (varF i) => TSel (varF i)
+    | TSel (varB i) => TSel (varB i)
+    | TSel (varH i) => if le_lt_dec n i then TSel (varH (i+1)) else TSel (varH i)
     | TMem T1 T2      => TMem (splice n T1) (splice n T2)
   end.
 
@@ -542,9 +545,15 @@ Definition spliceat n (V: (venv*ty)) :=
     | (G,T) => (G,splice n T)
   end.
 
-Lemma splice_open_permute: forall {X} (G0:list X) T2 n j c,
-(open_rec j (varH (n + S (length G0)) c) (splice (length G0) T2)) =
-(splice (length G0) (open_rec j (varH (n + length G0) c) T2)).
+Definition spliceb n (V: (bool*class*ty)) :=
+  match V with
+    | (a,c,T) => (a,c,splice n T)
+  end.
+
+
+Lemma splice_open_permute: forall {X} (G0:list X) T2 n j,
+(open_rec j (varH (n + S (length G0))) (splice (length G0) T2)) =
+(splice (length G0) (open_rec j (varH (n + length G0)) T2)).
 Proof.
   intros X G T. induction T; intros; simpl; eauto;
   try rewrite IHT1; try rewrite IHT2; try rewrite IHT; eauto;
@@ -590,6 +599,26 @@ Proof.
   intros G0 G2. induction G2; intros.
   - eapply indexr_max in H. simpl in H. omega.
   - simpl in H. destruct a.
+    case_eq (beq_nat x0 (length (G2 ++ G0))); intros E.
+    + rewrite E in H. inversion H. subst. simpl.
+      rewrite app_length in E.
+      rewrite app_length. rewrite map_length. simpl.
+      assert (beq_nat (x0 + 1) (length G2 + S (length G0)) = true). {
+        eapply beq_nat_true_iff. eapply beq_nat_true_iff in E. omega.
+      }
+      rewrite H1. eauto.
+    + rewrite E in H.  eapply IHG2 in H. eapply indexr_extend. eapply H. eauto.
+Qed.
+
+Lemma indexr_spliceb_hi: forall G0 G2 x0 v1 G T,
+    indexr x0 (G2 ++ G0) = Some (G, T) ->
+    length G0 <= x0 ->
+    indexr (x0 + 1) (map (spliceb (length G0)) G2 ++ v1 :: G0) =
+    Some (G, splice (length G0) T).
+Proof.
+  intros G0 G2. induction G2; intros.
+  - eapply indexr_max in H. simpl in H. omega.
+  - simpl in H. destruct a. destruct p.
     case_eq (beq_nat x0 (length (G2 ++ G0))); intros E.
     + rewrite E in H. inversion H. subst. simpl.
       rewrite app_length in E.
@@ -656,6 +685,15 @@ Proof.
   assert (indexr x0 G0 = Some (G, T)). eapply indexr_splice_lo0; eauto.
   eapply indexr_extend_mult. eapply indexr_extend. eauto.
 Qed.
+Lemma indexr_spliceb_lo: forall G0 G2 x0 v1 G T f,
+    indexr x0 (G2 ++ G0) = Some (G, T) ->
+    x0 < length G0 ->
+    indexr x0 (map (spliceb f) G2 ++ v1 :: G0) = Some (G, T).
+Proof.
+  intros.
+  assert (indexr x0 G0 = Some (G, T)). eapply indexr_splice_lo0; eauto.
+  eapply indexr_extend_mult. eapply indexr_extend. eauto.
+Qed.
 
 Lemma closed_splice: forall i j k T n,
   closed i j k T ->
@@ -677,6 +715,14 @@ Qed.
 
 Lemma map_spliceat_length_inc: forall G0 G2 v1,
    (length (map (spliceat (length G0)) G2 ++ v1 :: G0)) = (S (length (G2 ++ G0))).
+Proof.
+  intros. rewrite app_length. rewrite map_length. induction G2.
+  - simpl. reflexivity.
+  - simpl. eauto.
+Qed.
+
+Lemma map_spliceb_length_inc: forall G0 G2 v1,
+   (length (map (spliceb (length G0)) G2 ++ v1 :: G0)) = (S (length (G2 ++ G0))).
 Proof.
   intros. rewrite app_length. rewrite map_length. induction G2.
   - simpl. reflexivity.
@@ -836,7 +882,7 @@ Proof.
   inversion H; subst; eauto;
   try solve [omega];
   try solve [simpl in H0; constructor; apply IHn; eauto; try omega];
-  try solve [apply indexr_has in H1; destruct H1; eauto].
+  try solve [apply indexr_has in H1; destruct H1; destruct x0; destruct p; eauto].
   - simpl in H0.
     eapply stp_all.
     eapply IHn; eauto; try omega.
@@ -846,7 +892,6 @@ Proof.
     apply IHn; eauto.
     simpl. apply closed_open; auto using closed_inc.
     unfold open. rewrite <- open_preserves_size. omega.
-  - 
 Qed.
 
 Lemma stp_refl: forall T G GH,
@@ -878,7 +923,7 @@ Proof.
   intros n. induction n; intros; try omega.
   inversion H; subst; eauto; try omega; try simpl in H0.
   - destruct (IHn T1 G GH false) as [n1 IH1]; eauto; try omega.
-    destruct (IHn (open (varH (length GH)) T2) G ((G,T1)::GH) false); eauto; try omega.
+    destruct (IHn (open (varH (length GH)) T2) G ((true,c,(G,T1))::GH) false); eauto; try omega.
     simpl. apply closed_open; auto using closed_inc.
     unfold open. rewrite <- open_preserves_size. omega.
     eexists; econstructor; try constructor; eauto.
@@ -971,22 +1016,22 @@ Proof.
     exists GH0U. apply IH.
 Qed.
 
-Lemma stp_splice : forall GX G0 G1 T1 T2 v1,
+Lemma stp_splice : forall GX G0 G1 T1 T2 v1 a c,
    stp GX (G1++G0) T1 T2 ->
-   stp GX ((map (splice (length G0)) G1) ++ v1::G0)
+   stp GX ((map (spliceb (length G0)) G1) ++ (a,c,v1)::G0)
        (splice (length G0) T1) (splice (length G0) T2).
 Proof.
-  intros GX G0 G1 T1 T2 v1 H. remember (G1++G0) as G.
+  intros GX G0 G1 T1 T2 v1 a c H. remember (G1++G0) as G.
   revert G0 G1 HeqG.
   induction H; intros; subst GH; simpl; eauto.
   - Case "top".
     eapply stp_top.
-    rewrite map_splice_length_inc.
+    rewrite map_spliceb_length_inc.
     apply closed_splice.
     assumption.
   - Case "bot".
     eapply stp_bot.
-    rewrite map_splice_length_inc.
+    rewrite map_spliceb_length_inc.
     apply closed_splice.
     assumption.
   - Case "sel1".
@@ -1004,11 +1049,11 @@ Proof.
   - Case "sela1".
     case_eq (le_lt_dec (length G0) x); intros E LE.
     + eapply stp_sela1.
-      apply indexr_splice_hi. eauto. eauto.
+      apply indexr_spliceb_hi. eauto. eauto.
       eapply closed_splice in H0. assert (S x = x +1) as A by omega.
       rewrite <- A. eapply H0.
       eapply IHstp. eauto.
-    + eapply stp_sela1. eapply indexr_splice_lo. eauto. eauto. eauto.
+    + eapply stp_sela1. eapply indexr_spliceb_lo. eauto. eauto. eauto.
       assert (splice (length G0) TX=TX) as A. {
         eapply closed_splice_idem. eassumption. omega.
       }
@@ -1016,11 +1061,11 @@ Proof.
   - Case "sela2".
     case_eq (le_lt_dec (length G0) x); intros E LE.
     + eapply stp_sela2.
-      apply indexr_splice_hi. eauto. eauto.
+      apply indexr_spliceb_hi. eauto. eauto.
       eapply closed_splice in H0. assert (S x = x +1) as A by omega.
       rewrite <- A. eapply H0.
       eapply IHstp. eauto.
-    + eapply stp_sela2. eapply indexr_splice_lo. eauto. eauto. eauto.
+    + eapply stp_sela2. eapply indexr_spliceb_lo. eauto. eauto. eauto.
       assert (splice (length G0) TX=TX) as A. {
         eapply closed_splice_idem. eassumption. omega.
       }
@@ -1028,17 +1073,17 @@ Proof.
   - Case "selax".
     case_eq (le_lt_dec (length G0) x); intros E LE.
     + eapply stp_selax.
-      eapply indexr_splice_hi. eassumption. assumption.
-    + eapply stp_selax. eapply indexr_splice_lo. eauto. eauto.
+      eapply indexr_spliceb_hi. eassumption. assumption.
+    + eapply stp_selax. eapply indexr_spliceb_lo. eauto. eauto.
   - Case "all".
     eapply stp_all.
     eapply IHstp1. eauto. eauto. eauto.
 
-    simpl. rewrite map_splice_length_inc. apply closed_splice. assumption.
+    simpl. rewrite map_spliceb_length_inc. apply closed_splice. assumption.
 
-    simpl. rewrite map_splice_length_inc. apply closed_splice. assumption.
+    simpl. rewrite map_spliceb_length_inc. apply closed_splice. assumption.
 
-    specialize IHstp2 with (G3:=G0) (G4:=T3 :: G2).
+    specialize IHstp2 with (G3:=G0) (G4:=(true,c0,T3) :: G2).
     simpl in IHstp2. rewrite app_length. rewrite map_length. simpl.
     repeat rewrite splice_open_permute with (j:=0). subst x.
     rewrite app_length in IHstp2. simpl in IHstp2.
