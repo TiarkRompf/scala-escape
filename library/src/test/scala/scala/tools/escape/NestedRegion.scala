@@ -29,13 +29,13 @@ class NestedRegions extends CompilerTesting {
       type Cap = Any
       var p = 0L
       def alloc(n: Long)(implicit @local c: Cap) = new Data[Cap] {
-	def size = n
-	val addr = p
-	p += n
-	def apply(i: Long)(implicit @local c: Cap): Long =
-	  data((addr+i).toInt)
-	def update(i: Long, x:Long)(implicit @local cc: Cap): Unit =
-	  data((addr+i).toInt) = x
+      	def size = n
+      	val addr = p
+      	p += n
+      	def apply(i: Long)(implicit @local c: Cap): Long =
+      	  data((addr+i).toInt)
+      	def update(i: Long, x:Long)(implicit @local cc: Cap): Unit =
+      	  data((addr+i).toInt) = x
       }
     }
     try f(r)(cap) finally allocator.free(data.addr) //free(r.data)

@@ -33,20 +33,19 @@ class RegionSuite extends CompilerTesting {
       var data = new Array[Long](n.toInt) //malloc(n)
       var p = 0L
       def alloc(n: Long)(implicit @local c: Cap) = new Data[Cap] {
-	def size = n
-	val addr = p
-	p += n
-	def apply(i: Long)(implicit @local c: Cap): Long =
-	  data((addr+i).toInt)
-	def update(i: Long, x:Long)(implicit @local cc: Cap): Unit =
-	  data((addr+i).toInt) = x
+        def size = n
+        val addr = p
+        p += n
+        def apply(i: Long)(implicit @local c: Cap): Long =
+          data((addr+i).toInt)
+        def update(i: Long, x:Long)(implicit @local cc: Cap): Unit =
+          data((addr+i).toInt) = x
       }
     }
     try f(r)(cap) finally r.data = null //free(r.data)
   }
 
-  @Test def test1 = {
-    println("test1")
+  @Test def test1: Unit = {
     withRegion[Long](100) { r => c0 =>
       //for @lcoal[Nothing], succeed
       //for @local[Any]/@local, compile error
@@ -55,28 +54,29 @@ class RegionSuite extends CompilerTesting {
       val b = r.alloc(4)
       a(0) = 1
       b(1) = 2
-      println(a(0))
-      println(b(1))
+      assert(a(0) == 1)
+      assert(b(1) == 2)
+      //println(a(0))
+      //println(b(1))
       -1L
     }
-    println()
   }
 
-  @Test def test2 = {
-    println("test2")
+  @Test def test2: Unit = {
     var a: Data[_] = null
     withRegion[Long](100) { r => c0 =>
       @local implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
       val b = r.alloc(3)  // type: Data[r.Cap]
         a = b
       b(0) = 1
-      println(b(0))
-      //	  println(a(0))
+      //println(b(0))
+      //    println(a(0))
       -1L
     }
-    println("size of data: " + a.size)
-    //	println(a(0))		//error: accessing outside the scope. Couldn't find implicit parameter
-    println()
+    val size = a.size
+    assert(size == 3)
+    //println("size of data: " + size)
+    //  println(a(0))   //error: accessing outside the scope. Couldn't find implicit parameter
   }
 }
 
@@ -104,13 +104,13 @@ class OutRegionUnsafeSuite extends CompilerTesting{
       var data = new Array[Long](n.toInt) //malloc(n)
       var p = 0L
       def alloc(n: Long)(implicit c: Cap) = new Data[Cap] {
-	def size = n
-	val addr = p
-	p += n
-	def apply(i: Long)(implicit c: Cap): Long =
-	  data((addr+i).toInt)
-	def update(i: Long, x:Long)(implicit cc: Cap): Unit =
-	  data((addr+i).toInt) = x
+        def size = n
+        val addr = p
+        p += n
+        def apply(i: Long)(implicit c: Cap): Long =
+          data((addr+i).toInt)
+        def update(i: Long, x:Long)(implicit cc: Cap): Unit =
+          data((addr+i).toInt) = x
       }
     }
     try f(r)(cap) finally r.data = null //free(r.data)
@@ -126,10 +126,10 @@ class OutRegionUnsafeSuite extends CompilerTesting{
     withRegion[Long](100) { r => c0 =>
       implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
       val b = r.alloc(3)  // type: Data[r.Cap]
-	a = b
+  a = b
       b(0) = 100
       println(b(0))
-      rr = r   	//pass region r to outside
+      rr = r    //pass region r to outside
       -1L
     }
     println("size of data: " + a.size)
@@ -139,7 +139,7 @@ class OutRegionUnsafeSuite extends CompilerTesting{
     val aa: Data[r.Cap] = r.alloc(3)
     aa(0) = 99
     println(aa(0))
-    //		r.data = null
+    //    r.data = null
     println()
   }
   */
@@ -147,70 +147,68 @@ class OutRegionUnsafeSuite extends CompilerTesting{
 
 class OutRegionSuite extends CompilerTesting{
   @Test def test3 = expectEscErrorOutput(
-    //  	"value c cannot be used as 1st class value @local[Nothing]",
-    "missing parameter type\n"+
-      "missing parameter type\n"+
-      "could not find implicit value for parameter c: r.Cap\n"+
-      "could not find implicit value for parameter cc: r.Cap\n"+
-      "could not find implicit value for parameter cc: r.Cap",
-    """
-	trait Data[T] {
-	  def size: Long
-	  def apply(i: Long)(implicit @local cc: T): Long
-	  def update(i: Long, x:Long)(implicit @local cc: T): Unit
-	}
-	trait Region {
-	  type Cap
-	  def alloc(n: Long)(implicit @local c: Cap): Data[Cap]
-	}
+    //    "value c cannot be used as 1st class value @local[Nothing]",
+"""could not find implicit value for parameter c: r.Cap
+could not find implicit value for parameter cc: r.Cap
+could not find implicit value for parameter cc: r.Cap""",
+  """
+  trait Data[T] {
+    def size: Long
+    def apply(i: Long)(implicit @local cc: T): Long
+    def update(i: Long, x:Long)(implicit @local cc: T): Unit
+  }
+  trait Region {
+    type Cap
+    def alloc(n: Long)(implicit @local c: Cap): Data[Cap]
+  }
 
-	abstract class F[B] { def apply(r: Region): r.Cap -> B }
+  abstract class F[B] { def apply(r: Region): r.Cap -> B }
 
-	def withRegion[T](n: Long)(f: F[T]): T = {
-	  //pay attention not to access outOfBoundary?
-	  object cap
-	  val r = new Region {
-	    type Cap = cap.type
-	    var data = new Array[Long](n.toInt) //malloc(n)
-	    var p = 0L
-	    def alloc(n: Long)(implicit @local c: Cap) = new Data[Cap] {
-	      def size = n
-	      val addr = p
-	      p += n
-	      def apply(i: Long)(implicit @local c: Cap): Long =
-	        data((addr+i).toInt)
-	      def update(i: Long, x:Long)(implicit @local cc: Cap): Unit =
-	        data((addr+i).toInt) = x
-	    }
-	  }
-	  try f(r)(cap) finally r.data = null //free(r.data)
-	}
+  def withRegion[T](n: Long)(f: F[T]): T = {
+    //pay attention not to access outOfBoundary?
+    object cap
+    val r = new Region {
+      type Cap = cap.type
+      var data = new Array[Long](n.toInt) //malloc(n)
+      var p = 0L
+      def alloc(n: Long)(implicit @local c: Cap) = new Data[Cap] {
+        def size = n
+        val addr = p
+        p += n
+        def apply(i: Long)(implicit @local c: Cap): Long =
+          data((addr+i).toInt)
+        def update(i: Long, x:Long)(implicit @local cc: Cap): Unit =
+          data((addr+i).toInt) = x
+      }
+    }
+    try f(r)(cap) finally r.data = null //free(r.data)
+  }
   //pass region and Cap outside scope
-	println("test3")
-	var a: Data[_] = null
-	var rr: Region = null
-	var cc: Any = null
-	withRegion[Long](100) { r => c0 =>
-  		@local implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
-  		cc = c
-  		val b = r.alloc(3)  // type: Data[r.Cap]
-  		a = b
-  		b(0) = 100
-  		println(b(0))
-		rr = r   	//pass region r to outside
-		-1L
-	}
-	println("size of data: " + a.size)
-	val r = rr
-	/*	if we create a new cap, then we'll be able to access data within region
-	object cap
-	@local implicit val c = cap.asInstanceOf[r.Cap]
-	*/
-	/*	if we reuse the cap created within region, it fails to CompilerTesting	*/
-	val c = cc.asInstanceOf[r.Cap]	//val c = cc also fails
-	val aa: Data[r.Cap] = r.alloc(3)
-	aa(0) = 99
-	println(aa(0))
-	println()
-	""")
+  println("test3")
+  var a: Data[_] = null
+  var rr: Region = null
+  var cc: Any = null
+  withRegion[Long](100) { r => c0 =>
+      @local implicit val c = c0.asInstanceOf[r.Cap] // temporary bug!
+      cc = c
+      val b = r.alloc(3)  // type: Data[r.Cap]
+      a = b
+      b(0) = 100
+      println(b(0))
+    rr = r    //pass region r to outside
+    -1L
+  }
+  println("size of data: " + a.size)
+  val r = rr
+  /*  if we create a new cap, then we'll be able to access data within region
+  object cap
+  @local implicit val c = cap.asInstanceOf[r.Cap]
+  */
+  /*  if we reuse the cap created within region, it fails to CompilerTesting  */
+  val c = cc.asInstanceOf[r.Cap]  //val c = cc also fails
+  val aa: Data[r.Cap] = r.alloc(3)
+  aa(0) = 99
+  println(aa(0))
+  println()
+  """)
 }

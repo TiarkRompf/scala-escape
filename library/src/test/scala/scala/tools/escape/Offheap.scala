@@ -28,20 +28,19 @@ class RegionMallocSuite extends CompilerTesting {
       type Cap = cap.type
       var p = 0L
       def alloc(n: Long)(implicit @local c: Cap) = new Data[Cap] {
-	def size = n
-	val addr = p
-	p += n
-	def apply(i: Long)(implicit @local c: Cap): Long =
-	  data((addr+i).toInt)
-	def update(i: Long, x:Long)(implicit @local cc: Cap): Unit =
-	  data((addr+i).toInt) = x
+      	def size = n
+      	val addr = p
+      	p += n
+      	def apply(i: Long)(implicit @local c: Cap): Long =
+      	  data((addr+i).toInt)
+      	def update(i: Long, x:Long)(implicit @local cc: Cap): Unit =
+      	  data((addr+i).toInt) = x
       }
     }
     try f(r)(cap) finally allocator.free(data.addr) //free(r.data)
   }
 
   @Test def test101 {
-    println("test101:")
     withRegion[Long](1000) { r => c0 =>
       //for @lcoal[Nothing], succeed
       //for @local[Any]/@local, compile error
@@ -50,15 +49,13 @@ class RegionMallocSuite extends CompilerTesting {
       val b = r.alloc(400)  // how to create a variable of this type outside region?
       a(0) = 1
       b(1) = 2
-      println(a(0))
-      println(b(1))
+      assert(a(0) == 1)
+      assert(b(1) == 2)
       -1L
     }
-    println()
   }
 
   @Test def test100 {
-    println("test100:")
     var aa: Data[_] = null
     withRegion[Long](100) { r => c0 =>
       //for @lcoal[Nothing], succeed
@@ -67,12 +64,14 @@ class RegionMallocSuite extends CompilerTesting {
       val a = r.alloc(3)  // type: Data[r.Cap]
         aa = a
       a(0) = 1
-      println(a(0))
+      //println(a(0))
+      assert(a(0) == 1)
       -1L
     }
-    println("size of data = " + aa.size)
+    val size = aa.size
+    assert(size == 3)
+    //println("size of data = " + size)
     //		println(aa(0))		//error: accessing outside the scope. Couldn't find implicit parameter
-    println()
   }
 }
 
@@ -101,13 +100,13 @@ class OutRegionMallocUnsafeSuite extends CompilerTesting{
       type Cap = cap.type
       var p = 0L
       def alloc(n: Long)(implicit c: Cap) = new Data[Cap] {
-	def size = n
-	val addr = p
-	p += n
-	def apply(i: Long)(implicit c: Cap): Long =
-	  data((addr+i).toInt)
-	def update(i: Long, x:Long)(implicit cc: Cap): Unit =
-	  data((addr+i).toInt) = x
+      	def size = n
+      	val addr = p
+      	p += n
+      	def apply(i: Long)(implicit c: Cap): Long =
+      	  data((addr+i).toInt)
+      	def update(i: Long, x:Long)(implicit cc: Cap): Unit =
+      	  data((addr+i).toInt) = x
       }
     }
     try f(r)(cap) finally allocator.free(data.addr) //free(r.data)
@@ -137,19 +136,15 @@ class OutRegionMallocUnsafeSuite extends CompilerTesting{
     aa(0) = 2
     println(aa(0))
     //		r.data = null
-    println()
   }
   */
 }
 
 class OutRegionMallocSuite extends CompilerTesting{
   @Test def test103 = expectEscErrorOutput(
-    //  	"value c cannot be used as 1st class value @local[Nothing]",
-    "missing parameter type\n"+
-      "missing parameter type\n"+
-      "could not find implicit value for parameter c: r.Cap\n"+
-      "could not find implicit value for parameter cc: r.Cap\n"+
-      "could not find implicit value for parameter cc: r.Cap",
+"""could not find implicit value for parameter c: r.Cap
+could not find implicit value for parameter cc: r.Cap
+could not find implicit value for parameter cc: r.Cap""",
     """
   	import scala.offheap._
 
@@ -211,6 +206,5 @@ class OutRegionMallocSuite extends CompilerTesting{
 	val aa: Data[r.Cap] = r.alloc(400)
 	aa(0) = 2
 	println(aa(0))
-	println()
 	""")
 }

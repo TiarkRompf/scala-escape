@@ -51,6 +51,7 @@ lazy val library = project settings (scalaModuleOsgiSettings: _*) settings (Mima
     TestFrameworks.JUnit,
     s"-Dscala-escape-plugin.jar=${pluginJar.value.getAbsolutePath}"
   ),
+  parallelExecution in Test := false,
   // run mima during tests
   /*test in Test := {
     MimaKeys.reportBinaryIssues.value
