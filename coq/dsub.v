@@ -415,6 +415,8 @@ Hint Constructors list.
 
 Hint Resolve ex_intro.
 
+Hint Unfold env.
+
 (* ############################################################ *)
 (* Examples *)
 (* ############################################################ *)
@@ -1786,9 +1788,9 @@ Proof. intros. repeat eu. eapply stpd2_trans_aux; eauto. Qed.
 Lemma stp2_narrow_aux: forall n, forall m G1 T1 G2 T2 GH n0,
   stp2 false m G1 T1 G2 T2 GH n0 ->
   n0 <= n ->
-  forall GH1 GH0 GH' GX1 TX1 GX2 TX2,
-    GH=GH1++[(GX2,TX2)]++GH0 ->
-    GH'=GH1++[(GX1,TX1)]++GH0 ->
+  forall GH1 GH0 GH' GX1 TX1 GX2 TX2 aa cc,
+    GH=GH1++[(aa,cc,(GX2,TX2))]++GH0 ->
+    GH'=GH1++[(aa,cc,(GX1,TX1))]++GH0 ->
     stpd2 false false GX1 TX1 GX2 TX2 GH0 ->
     stpd2 false m G1 T1 G2 T2 GH'.
 Proof.
@@ -1796,7 +1798,7 @@ Proof.
   induction n.
   - Case "z". intros. inversion H0. subst. inversion H; eauto.
   - Case "s n". intros m G1 T1 G2 T2 GH n0 H NE. inversion H; subst;
-    intros GH1 GH0 GH' GX1 TX1 GX2 TX2 EGH EGH' HX; eauto.
+    intros GH1 GH0 GH' GX1 TX1 GX2 TX2 aa cc EGH EGH' HX; eauto.
     + SCase "top". eapply stpd2_top.
       subst. rewrite app_length. simpl. rewrite app_length in H0. simpl in H0. apply H0.
     + SCase "bot". eapply stpd2_bot.
@@ -1811,22 +1813,22 @@ Proof.
     + SCase "sela1".
       unfold id,venv,aenv in *.
       case_eq (beq_nat x (length GH0)); intros E.
-      * assert (indexr x ([(GX2, TX2)]++GH0) = Some (GX2, TX2)) as A2. {
+      * assert (indexr x ([(aa,cc,(GX2, TX2))]++GH0) = Some (aa,cc,(GX2, TX2))) as A2. {
           simpl. rewrite E. reflexivity.
         }
-        assert (indexr x GH = Some (GX2, TX2)) as A2'. {
+        assert (indexr x GH = Some (aa,cc,(GX2, TX2))) as A2'. {
           rewrite EGH. eapply indexr_extend_mult. apply A2.
         }
-        unfold venv in A2'. rewrite A2' in H0. inversion H0. subst.
+        unfold venv in A2'. unfold env in A2'. rewrite A2' in H0. inversion H0. subst.
         inversion HX as [nx HX'].
         eapply stpd2_sela1.
-        eapply indexr_extend_mult. simpl. rewrite E. reflexivity.
+        eapply indexr_extend_mult. simpl. unfold env in E. rewrite E. reflexivity.
         apply beq_nat_true in E. rewrite E. eapply stp2_closed1. eassumption.
         eapply stpd2_trans.
         eexists. eapply stp2_extendH_mult. eapply stp2_extendH_mult. eassumption.
         eapply IHn; try eassumption. omega.
         reflexivity. reflexivity.
-      * assert (indexr x GH' = Some (GX, TX)) as A. {
+      * assert (indexr x GH' = Some (a,c,(GX, TX))) as A. {
           subst.
           eapply indexr_same. apply E. eassumption.
         }
@@ -1835,22 +1837,22 @@ Proof.
     + SCase "sela2".
       unfold id,venv,aenv in *.
       case_eq (beq_nat x (length GH0)); intros E.
-      * assert (indexr x ([(GX2, TX2)]++GH0) = Some (GX2, TX2)) as A2. {
+      * assert (indexr x ([(aa,cc,(GX2, TX2))]++GH0) = Some (aa,cc,(GX2, TX2))) as A2. {
           simpl. rewrite E. reflexivity.
         }
-        assert (indexr x GH = Some (GX2, TX2)) as A2'. {
+        assert (indexr x GH = Some (aa,cc,(GX2, TX2))) as A2'. {
           rewrite EGH. eapply indexr_extend_mult. apply A2.
         }
-        unfold venv in A2'. rewrite A2' in H0. inversion H0. subst.
+        unfold venv in A2'. unfold env in A2'. rewrite A2' in H0. inversion H0. subst.
         inversion HX as [nx HX'].
         eapply stpd2_sela2.
-        eapply indexr_extend_mult. simpl. rewrite E. reflexivity.
+        eapply indexr_extend_mult. simpl. unfold env in E. rewrite E. reflexivity.
         apply beq_nat_true in E. rewrite E. eapply stp2_closed1. eassumption.
         eapply stpd2_trans.
         eexists. eapply stp2_extendH_mult. eapply stp2_extendH_mult. eassumption.
         eapply IHn; try eassumption. omega.
         reflexivity. reflexivity.
-      * assert (indexr x GH' = Some (GX, TX)) as A. {
+      * assert (indexr x GH' = Some (a,c,(GX, TX))) as A. {
           subst.
           eapply indexr_same. apply E. eassumption.
         }
@@ -1859,10 +1861,10 @@ Proof.
     + SCase "selax".
       unfold id,venv,aenv in *.
       case_eq (beq_nat x (length GH0)); intros E.
-      * assert (indexr x ([(GX2, TX2)]++GH0) = Some (GX2, TX2)) as A2. {
+      * assert (indexr x ([(aa,cc,(GX2, TX2))]++GH0) = Some (aa,cc,(GX2, TX2))) as A2. {
           simpl. rewrite E. reflexivity.
         }
-        assert (indexr x GH = Some (GX2, TX2)) as A2'. {
+        assert (indexr x GH = Some (aa,cc,(GX2, TX2))) as A2'. {
           rewrite EGH. eapply indexr_extend_mult. apply A2.
         }
         unfold venv in A2'. rewrite A2' in H0. inversion H0. subst.
@@ -1887,7 +1889,7 @@ Proof.
       rewrite <- A. reflexivity.
       rewrite <- A. assumption. rewrite <- A. assumption.
       subst.
-      eapply IHn with (GH1:=(G2, T4) :: GH1); try eassumption. omega.
+      eapply IHn with (GH1:=(true,c,(G2, T4)) :: GH1); try eassumption. omega.
       simpl. reflexivity. simpl. reflexivity.
     + SCase "wrapf".
       eapply stpd2_wrapf.
@@ -1899,10 +1901,10 @@ Proof.
 Grab Existential Variables. apply 0.
 Qed.
 
-Lemma stpd2_narrow: forall G1 G2 G3 G4 T1 T2 T3 T4 H,
+Lemma stpd2_narrow: forall G1 G2 G3 G4 T1 T2 T3 T4 H a c,
   stpd2 false false G1 T1 G2 T2 H -> (* careful about H! *)
-  stpd2 false false G3 T3 G4 T4 ((G2,T2)::H) ->
-  stpd2 false false G3 T3 G4 T4 ((G1,T1)::H).
+  stpd2 false false G3 T3 G4 T4 ((a,c,(G2,T2))::H) ->
+  stpd2 false false G3 T3 G4 T4 ((a,c,(G1,T1))::H).
 Proof.
   intros. inversion H1 as [n H'].
   eapply (stp2_narrow_aux n) with (GH1:=[]) (GH0:=H). eapply H'. omega.
