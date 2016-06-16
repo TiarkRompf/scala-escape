@@ -28,8 +28,8 @@ class RegionSuite extends CompilerTesting {
     //pay attention not to access outOfBoundary?
     object cap
     val r = new Region {
-      type Cap = Any
-      var data = new Array[Long](n.toInt)//malloc(n)
+      type Cap = cap.type
+      var data = new Array[Long](n.toInt) //malloc(n)
       var p = 0L
       def alloc(n: Long)(implicit @local c: Cap) = new Data[Cap] {
 	def size = n
@@ -99,8 +99,8 @@ class OutRegionUnsafeSuite extends CompilerTesting{
     //pay attention not to access outOfBoundary?
     object cap
     val r = new Region {
-      type Cap = Any
-      var data = new Array[Long](n.toInt)//malloc(n)
+      type Cap = cap.type
+      var data = new Array[Long](n.toInt) //malloc(n)
       var p = 0L
       def alloc(n: Long)(implicit c: Cap) = new Data[Cap] {
 	def size = n
@@ -169,8 +169,8 @@ class OutRegionSuite extends CompilerTesting{
 	  //pay attention not to access outOfBoundary?
 	  object cap
 	  val r = new Region {
-	    type Cap = Any
-	    var data = new Array[Long](n.toInt)//malloc(n)
+	    type Cap = cap.type
+	    var data = new Array[Long](n.toInt) //malloc(n)
 	    var p = 0L
 	    def alloc(n: Long)(implicit @local c: Cap) = new Data[Cap] {
 	      def size = n

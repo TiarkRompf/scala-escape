@@ -24,15 +24,9 @@ class NestedRegions extends CompilerTesting {
     implicit val allocator: Allocator = malloc
     //pay attention not to access outOfBoundary?
     object cap
-    val data = Array.uninit[Long](n.toInt)
-
+    val data = Array.uninit[Long](n.toInt) //malloc(n) // FIXME(Xilun) If we put it inside, we would get: Result type in structural refinement may not refer to a user-defined value class
     val r = new Region {
       type Cap = Any
-      //var data = Array.uninit[Long](n.toInt)	//Result type in structural refinement may not refer to a user-defined value class
-      //Solution is to put it outside new Region {} block
-      //var data = Array.uninit[Long](n.toInt).toArray
-      for (i <- 0 until n.toInt) data(i) = 0
-
       var p = 0L
       def alloc(n: Long)(implicit @local c: Cap) = new Data[Cap] {
 	def size = n
