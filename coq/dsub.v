@@ -2802,7 +2802,7 @@ Proof.
       rewrite <- HeqG. eauto.
     + simpl in HeqG. inversion HeqG.
       specialize (IHwf_envh GL GU H2). destruct IHwf_envh as [GYU [GYL [IHA IHB]]].
-      exists ((vvs, a)::GYU). exists GYL. split. rewrite IHA. simpl. reflexivity.
+      exists ((a,c,(vvs, t))::GYU). exists GYL. split. rewrite IHA. simpl. reflexivity.
       apply IHB.
 Qed.
 
@@ -2818,36 +2818,36 @@ Proof.
     eapply stpd2_bot. erewrite wfh_length; eauto. erewrite wf_length; eauto.
   - Case "mem". eapply stpd2_mem; eauto.
   - Case "sel1".
-    assert (exists v : vl, indexr x GX = Some v /\ val_type GX v TX) as A.
+    assert (exists v, indexr x GX = Some (a,c,v) /\ val_type GX v TX) as A.
     eapply indexr_safe_ex. eauto. eauto.
     destruct A as [? [? VT]].
     eapply inv_vtp_half in VT. ev.
     eapply stpd2_sel1. eauto. eauto. eauto. eapply stpd2_trans. eauto. eauto.
   - Case "sel2".
-    assert (exists v : vl, indexr x GX = Some v /\ val_type GX v TX) as A.
+    assert (exists v : vl, indexr x GX = Some (a,c,v) /\ val_type GX v TX) as A.
     eapply indexr_safe_ex. eauto. eauto.
     destruct A as [? [? VT]].
     eapply inv_vtp_half in VT. ev.
     eapply stpd2_sel2. eauto. eauto. eauto. eapply stpd2_trans. eauto. eauto.
   - Case "selx". eauto.
-    assert (exists v0 : vl, indexr x GX = Some v0 /\ val_type GX v0 v) as A.
+    assert (exists v0 : vl, indexr x GX = Some (a,c,v0) /\ val_type GX v0 v) as A.
     eapply indexr_safe_ex. eauto. eauto. eauto.
     destruct A as [? [? ?]].
     eapply stpd2_selx; eauto.
   - Case "sela1".
-    assert (exists v, indexr x GY = Some v /\ valh_type GX GY v TX) as A.
+    assert (exists v, indexr x GY = Some (a,c,v) /\ valh_type GX GY v TX) as A.
     eapply index_safeh_ex. eauto. eauto. eauto.
     destruct A as [? [? VT]]. destruct x0.
     inversion VT. subst.
     eapply stpd2_sela1. eauto. erewrite wf_length; eauto. eauto.
   - Case "sela2".
-    assert (exists v, indexr x GY = Some v /\ valh_type GX GY v TX) as A.
+    assert (exists v, indexr x GY = Some (a,c,v) /\ valh_type GX GY v TX) as A.
     eapply index_safeh_ex. eauto. eauto. eauto.
     destruct A as [? [? VT]]. destruct x0.
     inversion VT. subst.
     eapply stpd2_sela2. eauto. erewrite wf_length; eauto. eauto.
   - Case "selax".
-    assert (exists v0, indexr x GY = Some v0 /\ valh_type GX GY v0 v) as A.
+    assert (exists v0, indexr x GY = Some (a,c,v0) /\ valh_type GX GY v0 v) as A.
     eapply index_safeh_ex. eauto. eauto. eauto.
     destruct A as [? [? VT]]. destruct x0.
     destruct VT. subst.
@@ -2865,8 +2865,8 @@ Qed.
 
 (* ### Inversion Lemmas ### *)
 
-Lemma invert_app: forall venv vf vx T1 T2,
-  val_type venv vf (TAll T1 T2) ->
+Lemma invert_app: forall venv vf vx T1 T2 c,
+  val_type venv vf (TAll T1 c T2) ->
   val_type venv vx T1 ->
   closed 0 0 (length venv) T2 ->
   exists env tenv x y T3 T4,
