@@ -30,7 +30,7 @@ Low-level semantics STLCs 1/2 (Section 3.3 in the paper), and its lifetime prope
 	
 Note: We plan to update the statement of Lemma 3.1 and Theorem 3.2 in the paper to correspond more clearly to `fc_eval` in this file.
 
-In follows that evaluation in STLCs 1/2 never leaks stack references (Theorem 3.2 in the paper).
+It follows that evaluation in STLCs 1/2 never leaks stack references (Theorem 3.2 in the paper).
 
 ### File [stlc3.v](stlc3.v) ###
 
