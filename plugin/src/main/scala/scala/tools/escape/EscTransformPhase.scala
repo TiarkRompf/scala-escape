@@ -44,26 +44,21 @@ abstract class EscTransform extends PluginComponent with Transform with
 
     lazy val FstMode = NothingTpe
     lazy val SndMode = AnyTpe
-
 /*
     TODO:
 
-      - inheritance:
-          - subclasses may only add @local annotations, not remove them
-          - (TODO: implement check)
+      + check inheritance
+      + abstract over mode
       - objects:
           - what is the story for @local this?
           - can one call methods on @local objects?
 
-    Nothing = 1st class
-    Any = 2nd class
-
-    Anything inbetween in possible
-
 */
 
     // in general: 1st class is more specific than 2nd class
-    def traverse(tree: Tree, m: Type, boundary: List[Symbol]): Unit = tree match {
+    def traverse(tree: Tree, m: Type, boundary: List[Symbol]): Unit = {
+      curTree = tree
+      tree match {
       case Literal(x) =>
       case Ident(x) =>
         if (!isFstSym(tree.symbol)) {
@@ -86,18 +81,30 @@ abstract class EscTransform extends PluginComponent with Transform with
 
       case Apply(fun, args) =>
         traverse(fun,SndMode,boundary) // function is always 2nd class
-        println(s"--- apply ")
+        dprintln(s"--- apply ")
 
-        println(fun.symbol.name)
-        println(fun.symbol.owner.name)
-        println(fun.symbol.throwsAnnotations.map(_.tpe))
+        dprintln(fun.symbol.name)
+        dprintln(fun.symbol.owner.name)
+        dprintln(fun.symbol.throwsAnnotations.map(_.tpe))
 
 
 
         // find out mode to use for each argument (1st or 2nd)
         val modes = fun.tpe match {
           case mt @ MethodType(params,restpe) =>
-            params.map(symMode)
+            fun match { 
+              case Apply(TypeApply(Select(qual,name),_),_) => // TBD correct or need to apply type manually?
+                params.map(s => symMode(s).asSeenFrom(qual.tpe, fun.symbol.owner))
+              case TypeApply(Select(qual,name),_) => // TBD correct or need to apply type manually?
+                params.map(s => symMode(s).asSeenFrom(qual.tpe, fun.symbol.owner))
+              case Select(qual,name) =>
+                params.map(s => symMode(s).asSeenFrom(qual.tpe, fun.symbol.owner))
+              case Ident(_) =>
+                params.map(s => symMode(s))
+              case _ =>
+                //println("---> other: "+ fun.getClass + "/"+fun +"/"+fun.symbol.owner)
+                params.map(s => symMode(s))
+            }
           case _ => Nil
         }
         // check argument expressions according to mode
@@ -112,15 +119,26 @@ abstract class EscTransform extends PluginComponent with Transform with
         //traverse(rhs,symMode(tree.symbol),boundary)
         traverse(rhs,FstMode,boundary)
 
+      case If(cond, thenp, elsep) =>
+        traverse(cond,SndMode,boundary)
+        traverse(thenp,m,boundary)
+        traverse(elsep,m,boundary)
+
+      case LabelDef(name, params, rhs) =>
+        traverse(rhs,m,boundary)
+
+      case TypeDef(mods, name, tparams, rhs) =>
+        traverse(rhs,FstMode,boundary) // 1?
+
       case ValDef(mods, name, tpt, rhs) =>
-        println(s"--- recurse $m val: ${tree.symbol}")
+        //println(s"--- recurse $m val: ${tree.symbol}")
         traverse(rhs,symMode(tree.symbol),boundary) // need to check if val is 1st or 2nd
 
       case DefDef(mods, name, tparams, vparamss, tpt, rhs) if tree.symbol.isConstructor =>
         // do nothing
 
       case DefDef(mods, name, tparams, vparamss, tpt, rhs) =>
-        println(s"--- recurse $m def: ${tree.symbol}")
+        //println(s"--- recurse $m def: ${tree.symbol}")
 
         // if this def is 1st class, take it as new boundary
         val boundary1 = tree.symbol::boundary
@@ -128,7 +146,7 @@ abstract class EscTransform extends PluginComponent with Transform with
         traverse(rhs,FstMode,boundary1)
 
       case Function(vparams, body) =>
-        println(s"--- recurse $m func: ${tree.tpe}")
+        //println(s"--- recurse $m func: ${tree.tpe}")
 
         // if this def is 1st class, take it as new boundary
         tree.symbol.addAnnotation(newLocalMarker(m))
@@ -186,10 +204,22 @@ abstract class EscTransform extends PluginComponent with Transform with
 
       case New(tpt) =>   // TODO: what?
 
+      case Typed(expr, tpt) =>   // TODO: what?
+        traverse(expr,m,boundary)
+
       case EmptyTree =>
+
+      case Super(qual, mix) =>
+        traverse(qual,FstMode,boundary) // 1?
 
       case Throw(expr) =>
         traverse(expr,FstMode,boundary) // 
+
+      case Return(expr) =>
+        traverse(expr,FstMode,boundary) // escapes
+
+      case Import(expr, selectors) =>
+        traverse(expr,FstMode,boundary) // 1?
 
       case Match(selector, cases) =>        
         traverse(selector,FstMode,boundary)
@@ -197,17 +227,27 @@ abstract class EscTransform extends PluginComponent with Transform with
           traverse(body,m,boundary)
         }
 
+      case Try(block, catches, finalizer) =>
+        traverse(block,m,boundary)
+        catches foreach { case cd @ CaseDef(pat, guard, body) =>
+          traverse(body,m,boundary)
+        }
+        traverse(finalizer,m,boundary)
+
       case ClassDef(mods, name, params, impl) =>
-        impl match {
-          case Template(parents, self, body) =>
-            // perform a crude RefChecks run:
-            // subclasses are only allowed to _add_ @local annotations on
-            // method parameters, not to remove them.
+        //println(s"--- recurse $m class: ${tree.symbol}")
+        atOwner(tree.symbol) { 
+          traverse(impl,FstMode,boundary)
+        }
 
-            // TODO: what about annotations on members directly,
-            // not on method arguments?
+      case Template(parents, self, body) =>
+        atOwner(currentOwner) {
+        // perform a crude RefChecks run:
+        // subclasses are only allowed to _add_ @local annotations on
+        // method parameters, not to remove them.
 
-            atOwner(currentOwner) { 
+        // TODO: what about annotations on members directly,
+        // not on method arguments?
 
             def checkOverride(pair: SymbolPair) = {
               val member   = pair.low
@@ -249,34 +289,26 @@ abstract class EscTransform extends PluginComponent with Transform with
               opc.next()
             }
 
+            // now check body (TODO: 2? 1?)
             body.foreach(s => traverse(s,SndMode,boundary))
-
-            }
         }
-        // TODO
-        //println(s"--- class def ${tree}")
 
-      //case ModuleDef(mods, name, impl) =>
-        // TODO
+      case ModuleDef(mods, name, impl) =>
+        traverse(impl,FstMode,boundary)
 
-      //case PackageDef(mods, name, impl) =>
-
+      case PackageDef(pid, stats) =>
+        atOwner(tree.symbol) {
+          stats.foreach(s => traverse(s,SndMode,boundary))
+        }
 
       case _ =>
         println(s"don't know how to handle ${tree.getClass}")
-    }
+    }}
 
 
-    override def transform(tree: Tree): Tree = tree match {
-      case DefDef(mods, name, tparams, vparamss, tpt, rhs) if !tree.symbol.isConstructor =>
-        if (name.toString contains "test") {
-        println(s"start def: ${tree.symbol}")
-        traverse(tree,FstMode,Nil)
-        tree
-        } else
-        super.transform(tree)
-      case _ =>
-        super.transform(tree)
+    override def transform(tree: Tree): Tree = {
+      traverse(tree,FstMode,Nil)
+      tree
     }
   }
 
