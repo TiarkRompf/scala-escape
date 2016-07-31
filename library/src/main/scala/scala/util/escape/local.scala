@@ -18,7 +18,10 @@ trait `->`[-A,+B] extends Function1[A,B] {
   def apply(@local[Any] y: A): B
 }
 
-
+// Note: must be top-level, so compiler phase can detect it by prefix "->"
+trait `->*`[P, -A,+B] extends Function1[A,B] {
+  def apply(@local[P] y: A): B
+}
 
 object ESC {
     def NO[T](x:T):T = x

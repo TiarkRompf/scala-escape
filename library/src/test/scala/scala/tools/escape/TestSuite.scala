@@ -320,3 +320,83 @@ class TryCatch extends CompilerTesting {
   }
 
 }
+
+// TODO: `->*` only works from tests if declared outside test/ classpath?
+// trait `->*`[P, -A,+B] extends Function1[A,B] {
+//   def apply(@local[P] y: A): B
+// }
+
+class FinerGrain2ndClassAttempt extends CompilerTesting {
+  val defs = """
+    trait Secret extends Any
+    trait Public extends Secret
+
+    class File {
+      def read() = ???  // FIXME: cannot return 2nd-class value: @local[Public]
+      def write[T](@local[Public] obj: T) {}
+    }
+    val file = new File
+    """
+
+  @Test def testExposeSecret = expectEscErrorOutput(
+    "value secret cannot be used as 1st class value @local[Public]",
+    defs + """
+    def exposeSecret[U](
+      fn: ->*[Public, String, U]
+    ) = fn("password")
+
+    exposeSecret { secret =>
+      // FIXME: if I add @local to file, it should fail (note fn is 1st-class),
+      // requiring at least: @local[Secret] fn
+      file.read          // ok
+      file.write(secret) // error
+      () // fool-proof return
+    }
+    """)
+
+  @Test def testProtectSecret = expectEscErrorOutput(
+    "value secret cannot be used as 1st class value @local[Public]",
+    defs + """
+    def protectSecret[T, U](@local[Secret] obj: T)(
+      @local[Public] fn: `->*`[Secret, T, U]) = fn(obj)
+
+    @local[Secret] val outerSecret = "password"
+
+    // user code that attempting to store a secret
+    @local[Public] val leakChannel = new {
+      def leak(@local[Secret] secret: Any) {}
+    }
+
+    leakChannel.leak("upcast to secret")
+
+    protectSecret("anotherPassword") { secret =>
+      file.read          // ok
+      file.write(secret) // error
+      // outerSecret     // error (free var: @local[>:Public])
+      // leakChannel // Note: this should fail, as we could call leak()
+                     //       Unfortunatly, putting @local[Secret] on fn
+                     //       would have the opposite effect; that is,
+                     //       no access to outer secrets would be possible
+                     // So, we see that hierarchy should be backward for reads,
+                     // but then, we would have the problem with writing.
+      // leakChannel.leak(secret)  // FIXME: fails becase of a wrong reason:
+                                // value secret @local[Any] cannot be used
+                                // as 1st class value
+                                // @local[...SecretCannotLeak.Secret]
+                                   // OR crashes if Secret = Any
+      () // fool-proof return
+    }
+    """)
+
+  @Test def testUpcastToSecret = expectEscErrorOutput(
+    "", """
+    trait Secret extends Any
+    trait Public extends Secret
+      // Another way of achieving the above (buggy) behavior
+      @local[Public] val sUnprotected = "semi-secret";
+      {  // but we can simply up-cast to pretect it against file write
+        @local[Secret] val sProtected = sUnprotected
+        // file.write(sProtected) // error
+      }
+    """)
+}
