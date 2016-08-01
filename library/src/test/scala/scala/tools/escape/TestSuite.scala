@@ -1,6 +1,6 @@
 package scala.tools.escape
 
-import org.junit.Test
+import org.junit.{ Ignore, Test }
 import org.junit.Assert.assertEquals
 
 import scala.annotation._
@@ -327,6 +327,42 @@ class TryCatch extends CompilerTesting {
 // }
 
 class FinerGrain2ndClassAttempt extends CompilerTesting {
+  val lowerDefAndPassthrough = """
+    trait Lower extends Any
+
+    def passthroughLower(@local[Lower] fn: Int => Any) = fn(42)
+    """
+
+  @Test def testClosureCanAccessFirstClass = expectEscErrorOutput(
+    "",
+    lowerDefAndPassthrough + """
+    @local[Nothing] val fst = 1
+    passthroughLower(x => x + fst)
+    """)
+
+  @Test def testClosureCannotAccessHigher2ndClass = expectEscErrorOutput(
+    "value hi cannot be used as 1st class value @local[Nothing]",
+    lowerDefAndPassthrough + """
+    @local[Any] val hi = 2
+    passthroughLower(x => x + hi)
+    """)
+
+  @Ignore // FIXME: same-privileged free values must be accessible
+  @Test def testClosureCanAccessSame2ndClass = expectEscErrorOutput(
+    "",
+    lowerDefAndPassthrough + """
+    @local[Lower] val lo = 1
+    passthroughLower(x => x + lo)
+    """)
+
+  @Test def testClosureCannotAccessUnrelatedlyPrivileged = expectEscErrorOutput(
+    "value sndUnrelated cannot be used as 1st class value @local[Nothing]",
+    lowerDefAndPassthrough + """
+    trait Unrelated
+    @local[Unrelated] val sndUnrelated = 2
+    passthroughLower(x => x + sndUnrelated)
+    """)
+
   val defs = """
     trait Secret extends Any
     trait Public extends Secret
