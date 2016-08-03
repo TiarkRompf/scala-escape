@@ -18,7 +18,7 @@ class CompilerTesting {
     val errors = escErrorMessages(msg, code)
 //    println("errors:")
 //    errors foreach println
-    assert((errors mkString "\n") == msg, errors mkString "\n")
+    assert((errors mkString "\n") == msg.stripMargin.trim, errors mkString "\n")
   }
 
   def expectEscError(msg: String, code: String) = {
