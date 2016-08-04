@@ -435,4 +435,43 @@ class FinerGrain2ndClassAttempt extends CompilerTesting {
         // file.write(sProtected) // error
       }
     """)
+
+  @Test def testNoWriteInReduce = expectEscErrorOutput(
+    """value fDebug cannot be used inside value $anonfun
+      |value f cannot be used inside value $anonfun
+    """, // FIXME: the second error is a bug, same as with the Secret example
+    """
+    class File(n: String) {
+      def readCharAt(idx: Int) = '?'
+      def print(xs: Any*) {}
+    }
+
+    trait R // (implicitly <:Any and >:Nothing)
+
+    def withFile[U](n: String)(@local fn: File -> U): U = fn(new File(n))
+    def withFileR[U](n: String)(@local[R] fn: ->*[R, File, U]): U =
+      fn(new File(n))
+
+    def reduce[T](xs: Seq[T])(@local[R] op: (T, T) => T): T =
+      xs match {
+        case Seq(last) => last
+        case _ => op(xs.head, reduce(xs.tail)(op))
+      }
+
+    val contents = withFile("/dev/stderr") { fDebug =>
+      reduce(Seq("force", "there", "is")) { (chars1, chars2) =>
+        fDebug.print(chars1, chars2) // error
+        chars1 + chars2
+      }
+    }
+    withFile("/some/chars") { fOut => fOut.print(contents) }
+
+    val pairs = contents.zipWithIndex // e.g., ('i', 0), ('s', 1)
+      withFileR("/some/chars") { f => // type of f: @local[R] File
+        reduce(pairs) { (p1, p2) =>
+          val i = (p1._2 + p2._2) / 2
+          (f.readCharAt(i), i)  // ok
+        }
+      }
+    """)
 }
