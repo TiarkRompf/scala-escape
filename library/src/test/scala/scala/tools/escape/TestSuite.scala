@@ -341,26 +341,25 @@ class FinerGrain2ndClassAttempt extends CompilerTesting {
     """)
 
   @Test def testClosureCannotAccessHigher2ndClass = expectEscErrorOutput(
-    "value hi cannot be used as 1st class value @local[Nothing]",
+    "value hi cannot be used inside value $anonfun",
     lowerDefAndPassthrough + """
     @local[Any] val hi = 2
-    passthroughLower(x => x + hi)
+    passthroughLower(x => { hi; () })
     """)
 
-  @Ignore // FIXME: same-privileged free values must be accessible
   @Test def testClosureCanAccessSame2ndClass = expectEscErrorOutput(
     "",
     lowerDefAndPassthrough + """
     @local[Lower] val lo = 1
-    passthroughLower(x => x + lo)
+    passthroughLower(x => { lo; () })
     """)
 
   @Test def testClosureCannotAccessUnrelatedlyPrivileged = expectEscErrorOutput(
-    "value sndUnrelated cannot be used as 1st class value @local[Nothing]",
+    "value sndUnrelated cannot be used inside value $anonfun",
     lowerDefAndPassthrough + """
     trait Unrelated
     @local[Unrelated] val sndUnrelated = 2
-    passthroughLower(x => x + sndUnrelated)
+    passthroughLower(x => { sndUnrelated; () })
     """)
 
   val defs = """
