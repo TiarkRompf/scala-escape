@@ -15,13 +15,13 @@ import java.io.{StringWriter,PrintWriter}
 class Basic extends CompilerTesting {
   @Test def test01 = expectEscErrorOutput(
   "value x cannot be used as 1st class value @local[Nothing]",
-  """    
+  """
     def fst(@local x: String) = println(x)
   """)
 
   @Test def test02 = expectEscErrorOutput(
   "value x cannot be used as 1st class value @local[Nothing]",
-  """    
+  """
     def fst(@local x: String) = x
   """)
 
@@ -78,7 +78,7 @@ class Basic extends CompilerTesting {
     def withFile[R](n: String)(@local fn: PrintWriter -> R): R = {
       val f = new PrintWriter(new StringWriter()); try fn(f) finally f.close()
     }
-    withFile("a.out") { f1 => 
+    withFile("a.out") { f1 =>
       withFile("b.out") { f2 =>
         f1.println("one")
         f2.println("two")
@@ -99,7 +99,7 @@ class Local extends CompilerTesting {
   }
 
   @Test def test11: Unit = expectEscError(
-  "value x cannot be used as 1st class value @local[Nothing]", 
+  "value x cannot be used as 1st class value @local[Nothing]",
   """
     def foo(f: Int->Int) = f(1)
     def g(@local x: Int) = x // return x should fail
@@ -114,7 +114,7 @@ class Local extends CompilerTesting {
   }
 
   @Test def test13: Unit = expectEscError(
-  "value io cannot be used inside method foo", 
+  "value io cannot be used inside method foo",
   """
     class IO
     def println(s:String)(@local io: IO) = Console.println(s)
@@ -136,7 +136,7 @@ class Local extends CompilerTesting {
   }
 
   @Test def test15: Unit = expectEscError(
-  "value io cannot be used inside value $anonfun", 
+  "value io cannot be used inside value $anonfun",
   """
     class IO
     def println(s:String)(implicit @local io: IO) = { }
@@ -370,14 +370,14 @@ class FinerGrain2ndClassAttempt extends CompilerTesting {
       def read() = ???  // FIXME: cannot return 2nd-class value: @local[Public]
       def write[T](@local[Public] obj: T) {}
     }
-    val file = new File
+    @local val file = new File
     """
 
   @Test def testExposeSecret = expectEscErrorOutput(
     "value secret cannot be used as 1st class value @local[Public]",
     defs + """
     def exposeSecret[U](
-      fn: ->*[Public, String, U]
+      fn: String -> U //->*[Public, String, U]
     ) = fn("password")
 
     exposeSecret { secret =>
