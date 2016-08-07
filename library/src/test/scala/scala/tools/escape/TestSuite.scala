@@ -435,6 +435,40 @@ class FinerGrain2ndClassAttempt extends CompilerTesting {
       }
     """)
 
+  val multiLevelFileAndSecretDefs = """
+    type Public = Any
+    trait Secret extends Public
+
+    class File
+    def read(@local f: File) = "contents"
+    def write(@local[Secret] f: File, s: String) {}
+
+    def exposeSecret[U](  // note: does not permit access to non-Secret files
+      @local[Public]  // FIXME: -> makes fn 2nd-class even if we remove @local?
+      fn: String => U
+    ) = fn("password")
+  """
+
+  @Test def testNoWriteSecretToPublicFile = expectEscErrorOutput(
+    "value f cannot be used as 1st class value @local[Secret]",
+    multiLevelFileAndSecretDefs + """
+    @local[Public] val f: File = new File
+    exposeSecret { secret =>
+      read(f)          // ok
+      write(f, secret) // error
+    }
+    """)
+
+  @Test def testCanWriteSecretToSecretFile = expectEscErrorOutput(
+    "",
+    multiLevelFileAndSecretDefs + """
+    @local[Secret] val f: File = new File
+    exposeSecret { secret =>
+      read(f)          // ok
+      write(f, secret) // ok
+    }
+    """)
+
   @Test def testNoWriteInReduce = expectEscErrorOutput(
     """value fDebug cannot be used inside value $anonfun
       |value f cannot be used inside value $anonfun
