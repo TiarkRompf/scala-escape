@@ -1,9 +1,24 @@
-The Great Escape
-================
+2nd-Class Values with Bounded Lifetimes
+=======================================
 
-First-class service is nice. But if everybody rides first class, it stops being fun.
+First-class functions dramatically increase expressiveness,
+at the expense of static guarantees.
 
-This Scala compiler plug-in exposes a programming model to enforce a _no-escape_ policy for certain objects.
+In ALGOL or PASCAL, functions could be passed as arguments
+but never escape their defining scope. 
+Therefore, function arguments could serve as temporary access
+tokens or capabilities, enabling callees to perform some 
+action, but only for the duration of the call.
+
+In modern languages, such programming patterns are 
+no longer available.
+
+The central thrust of this work is to re-introduce 
+second-class functions and other values alongside 
+first-class entities in modern languages. 
+
+This Scala compiler plug-in exposes a programming model to 
+enforce a _no-escape_ policy for certain objects.
 
 There are many potential uses:
 
@@ -18,19 +33,30 @@ There are many potential uses:
 - Distributed systems:
     We do not want to serialize large data by accident (see Spores).
 
+The key ideas for combining first- and second-class values in a single language are as follows:
+
+- First-class functions may not refer to second-class values through free variables
+- All functions must return first-class values, and only
+  first-class values may be stored in object fields or mutable
+  variables 
+
+Together, these rules ensure that second-class values never escape their
+defining scope.
+
+More details are described in our OOPLA'16 paper:
+
+- [Gentrification Gone too Far? Affordable 2nd-Class Values for Fun and (Co-)Effect](https://www.cs.purdue.edu/homes/rompf/papers/osvald-oopsla16.pdf)
+
 
 A High-Level Example
 --------------------
 
-If an expression has type `A @safe(x)` it will not leak symbol `x`.
-
-If a function has type `A => B @safe(%)`, it will not leak its argument.
-Think of this as a dependent function type `(x:A) => B @safe(x)`.
+If a variable or function parameter is marked `@local`, it will be second-class, and thus it must not escape.
 
     // For exception handling, we would like to enforce that
     // exceptions can only be raised within a try/catch block.
 
-    def trycatch(f: (Exception => Nothing) => Unit @safe(%)): Unit
+    def trycatch(f: @local (Exception => Nothing) => Unit): Unit
 
     // The closure passed to trycatch may not leak its argument.
 
@@ -41,7 +67,7 @@ Think of this as a dependent function type `(x:A) => B @safe(x)`.
     // Inside a try block we can use `raise` in safe positions,
     // but not in unsafe ones, where it could be leaked.
 
-    def safeMethod(f: () => Any): Int @safe(f)
+    def safeMethod(@local f: () => Any): Int
     def unsafeMethod(f: () => Any): Int
 
     trycatch { raise =>
@@ -54,39 +80,6 @@ Think of this as a dependent function type `(x:A) => B @safe(x)`.
     }
 
 See the [test suite](library/src/test/scala/scala/tools/escape) for complete code.
-
-
-Practical Restrictions
-----------------------
-
-Consider the following example:
-
-    def map[A,B](xs: List[A])(f: A => B): List[B] @safe(f) = {
-      val b = new Builder[B]
-      xs foreach (x => b += f(x))
-      b.result
-    }
-
-We are not leaking `f`, but we _are_ leaking objects returned
-from calling `f`.
-
-It is no problem to use `map` like this:
-
-    map(xs) { x =>
-      if (x > 0) x else raise(new Exception)
-    }
-
-But we need to be careful about cases where
-we could transitively leak `raise`, e.g. as part of
-another closure:
-
-    map(xs) { x =>
-      () => raise(new Exception)
-    }
-
-The design decision here is to disallow this case.
-
-Extensions to _n-level_ safety are conceivable.
 
 
 Rationale and Background
@@ -103,11 +96,3 @@ While programming with first-class objects is incredibly useful, it is sometimes
 For example, in a language without closures, function calls follow a strict stack discipline. A local variable's lifetime ends when the function returns and its space can be reclaimed. Contrast this with higher-order languages, which allocate closure records on the heap. The lifetime of a variable may be indefinite if it is captured by a closure.
 
 Binding the lifetime of (certain -- not all) objects is important. So maybe not all objects should be first class?
-
-After all, we want first class to be an exclusive club, with tightly regulates access. 
-
-
-Current Status
---------------
-
-Early development and proof of concept. Do not expect too much, but feel free to contribute!
