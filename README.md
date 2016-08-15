@@ -47,6 +47,13 @@ More details are described in our OOPLA'16 paper:
 
 - [Gentrification Gone too Far? Affordable 2nd-Class Values for Fun and (Co-)Effect](https://www.cs.purdue.edu/homes/rompf/papers/osvald-oopsla16.pdf)
 
+The `coq` subdirectory contains mechanized proofs for the theorems in the paper.
+
+We also provide a modified version of the Scala distribution, where higher-order functions in the standard library (especially collections) are annotated as second class where possible:
+
+- [https://github.com/losvald/scala/tree/esc](https://github.com/losvald/scala/tree/esc)
+
+
 
 A High-Level Example
 --------------------
