@@ -60,31 +60,33 @@ A High-Level Example
 
 If a variable or function parameter is marked `@local`, it will be second-class, and thus it must not escape.
 
-    // For exception handling, we would like to enforce that
-    // exceptions can only be raised within a try/catch block.
+```scala
+// For exception handling, we would like to enforce that
+// exceptions can only be raised within a try/catch block.
 
-    def trycatch(f: @local (Exception => Nothing) => Unit): Unit
+def trycatch(f: @local (Exception => Nothing) => Unit): Unit
 
-    // The closure passed to trycatch may not leak its argument.
+// The closure passed to trycatch may not leak its argument.
 
-    trycatch { raise =>
-      raise(new Exception)  // ok: raise cannot escape
-    }
+trycatch { raise =>
+  raise(new Exception)  // ok: raise cannot escape
+}
 
-    // Inside a try block we can use `raise` in safe positions,
-    // but not in unsafe ones, where it could be leaked.
+// Inside a try block we can use `raise` in safe positions,
+// but not in unsafe ones, where it could be leaked.
 
-    def safeMethod(@local f: () => Any): Int
-    def unsafeMethod(f: () => Any): Int
+def safeMethod(@local f: () => Any): Int
+def unsafeMethod(f: () => Any): Int
 
-    trycatch { raise =>
-      safeMethod { () =>
-        raise(new Exception)  // ok: closure is safe
-      }
-      unsafeMethod { () =>
-        raise(new Exception)  // not ok
-      }
-    }
+trycatch { raise =>
+  safeMethod { () =>
+    raise(new Exception)  // ok: closure is safe
+  }
+  unsafeMethod { () =>
+    raise(new Exception)  // not ok
+  }
+}
+```
 
 See the [test suite](library/src/test/scala/scala/tools/escape) for complete code.
 
