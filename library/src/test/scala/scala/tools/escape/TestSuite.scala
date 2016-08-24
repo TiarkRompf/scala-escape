@@ -364,25 +364,24 @@ class FinerGrain2ndClassAttempt extends CompilerTesting {
 
   val defs = """
     trait Secret extends Any
-    trait Public extends Secret
+    trait Public extends Secret // FIXME: nothing prevents type Public = Nothing
 
     class File {
       def read() = ???  // FIXME: cannot return 2nd-class value: @local[Public]
       def write[T](@local[Public] obj: T) {}
     }
-    @local val file = new File
+    @local[Public] val file = new File
     """
 
   @Test def testExposeSecret = expectEscErrorOutput(
     "value secret cannot be used as 1st class value @local[Public]",
     defs + """
     def exposeSecret[U](
-      fn: String -> U //->*[Public, String, U]
+      @local[Secret] // allow access to outer secrets
+      fn: `->*`[Secret, String, U]
     ) = fn("password")
 
     exposeSecret { secret =>
-      // FIXME: if I add @local to file, it should fail (note fn is 1st-class),
-      // requiring at least: @local[Secret] fn
       file.read          // ok
       file.write(secret) // error
       () // fool-proof return
