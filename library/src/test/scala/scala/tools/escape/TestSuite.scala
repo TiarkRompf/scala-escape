@@ -506,4 +506,30 @@ class FinerGrain2ndClassAttempt extends CompilerTesting {
         }
       }
     """)
+
+  @Test def testDropAccess = expectEscErrorOutput(
+    "value passwd cannot be used as 1st class value @local[Nothing]",
+    """
+    type TopSec = Any
+    trait Sec extends TopSec
+    type Pub = Nothing
+
+    def dropToSec[U](@local[Sec] body: () => U) = body()
+    def dropToPub[U](@local[Pub] body: () => U) = body()
+
+    def cryptoHash(@local[TopSec] passwd: String): String = ???
+    def addUser(@local[Sec] email: String): Int = ???
+    def setPassword(userId: Int, passwdHash: String) = ???
+    def register(@local[Sec] user: String, @local[TopSec] passwd: String) {
+      val passwdHash = cryptoHash(passwd) // fully trusted code
+      dropToSec { () => // semi-trusted code
+        val userId =
+          addUser(user)   // ok
+        print(passwd)     // error
+        dropToPub { () => // untrusted code
+          setPassword(userId, passwdHash)
+        }
+      }
+    }
+    """)
 }
