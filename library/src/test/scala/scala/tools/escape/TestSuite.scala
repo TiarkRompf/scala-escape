@@ -533,3 +533,39 @@ class FinerGrain2ndClassAttempt extends CompilerTesting {
     }
     """)
 }
+
+// distinguish between read and write capabilities for files,
+// with different escape policies
+class FinerGrain2ndClassAttempt2 extends CompilerTesting {
+  @Test def test10: Unit = expectEscErrorOutput(
+  "value c cannot be used inside value $anonfun",
+  """
+    trait CanWrite
+    trait OnePointFive
+
+    def main(implicit @local c: CanWrite): Unit = {
+      class File(val path: String) {
+        def read(): String = "<file contents>"  
+        def write(data: String)(implicit @local c: CanWrite): Unit = {}
+        def close(): Unit = {}
+      }
+
+      def withFile[R](n: String)(@local fn: ->*[OnePointFive,File,R]): R = {
+        val f = new File(n); try fn(f) finally f.close()
+      }    
+      def reduce(xs: Seq[Int])(@local[OnePointFive] f: (Int,Int) => Int) = f(xs(0),xs(1)) // stub
+
+      withFile("test.out") { f =>
+        f.read()
+        f.write("foobar")
+        reduce(List(3,4)) { (l,r) =>
+          f.read()
+          f.write("baz") // error
+          l+r
+        }
+      }
+    }
+  """)
+
+}
+
