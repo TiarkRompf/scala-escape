@@ -536,23 +536,26 @@ class FinerGrain2ndClassAttempt extends CompilerTesting {
 // distinguish between read and write capabilities for files,
 // with different escape policies
 class FinerGrain2ndClassAttempt2 extends CompilerTesting {
-  @Test def test10: Unit = expectEscErrorOutput(
-  "value c cannot be used inside value $anonfun",
-  """
+  val defCommon = """
     trait CanWrite
     trait OnePointFive
 
+    def reduce[T](xs: Seq[T])(@local[OnePointFive] f: (T,T) => T) = f(xs(0),xs(1)) // stub
+  """
+
+  @Test def testLessPrivilegedFile: Unit = expectEscErrorOutput(
+  "value c cannot be used inside value $anonfun",
+  defCommon + """
     def main(implicit @local c: CanWrite): Unit = {
       class File(val path: String) {
-        def readAll(): String = "<file contents>"
+        def readAll(): String = "<contents>"
         def append(data: String)(implicit @local c: CanWrite): Unit = {}
         def close(): Unit = {}
       }
 
-      def withFile[R](n: String)(@local fn: ->*[OnePointFive,File,R]): R = {
+      def withFile[U](n: String)(@local fn: ->*[OnePointFive,File,U]): U = {
         val f = new File(n); try fn(f) finally f.close()
       }
-      def reduce[T](xs: Seq[T])(@local[OnePointFive] f: (T,T) => T) = f(xs(0),xs(1)) // stub
 
       withFile("test.out") { f =>
         f.append("contents")
@@ -566,4 +569,35 @@ class FinerGrain2ndClassAttempt2 extends CompilerTesting {
     }
   """)
 
+  @Test def testNonPrivilegedFile: Unit = expectEscErrorOutput(
+  "value out cannot be used inside value $anonfun",
+  defCommon + """
+    trait CanRead
+
+    class File(val path: String) {
+      def readAll()(implicit @local[OnePointFive] c: CanRead) = "<contents>"
+      def append(data: String)(implicit @local c: CanWrite): Unit = {}
+      def close(): Unit = {}
+    }
+
+    def withFileR[U](n: String)(@local fn: File => ->*[OnePointFive,CanRead, U]): U =
+      withFile(n) { f => fn(f)(new CanRead {}) }
+    def withFileW[U](n: String)(@local fn: File => CanWrite -> U): U =
+      withFile(n) { f => fn(f)(new CanWrite {}) }
+    def withFile[U](n: String)(@local fn: File => U): U = {
+      val f = new File(n); try fn(f) finally f.close()
+    }
+
+    withFileW("test.out") { f => implicit out =>
+      f.append("contents")
+      withFileR("test.out") { fIn => implicit in =>
+        val len = fIn.readAll().length
+        reduce(Range(0, len)) { (l, r) =>
+          val contents = f.readAll()         // ok
+          f.append(contents.substring(l, r)) // error
+          (l + r) / 2
+        }
+      }
+    }
+  """)
 }
