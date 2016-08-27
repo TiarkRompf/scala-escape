@@ -181,10 +181,18 @@ abstract class EscTransform extends PluginComponent with Transform with
         if tpt.symbol == cd.symbol
         && parents.exists(t => isSndFun(t.tpe))
         =>
-          
+          // find 2nd class function prototype
+          val Some(base) = parents.find(t => isSndFun(t.tpe))
+
+          // extract 'classiness' FIXME: proper sym lookup
+          val mode = if (base.tpe.toString.startsWith("scala.util.escape.->*"))
+            base.tpe.typeArgs(0) // e.g. `->*`[ReadOnly,File,Int]
+          else // `->`
+            SndMode
+
           // add @local annotation to closure parameter
           val List(List(bvparam)) = bvparamss
-          bvparam.symbol.addAnnotation(newLocalMarker(SndMode)) // TODO: more precise type?
+          bvparam.symbol.addAnnotation(newLocalMarker(mode))
 
           // if this def is 1st class, take it as new boundary
           bd.symbol.addAnnotation(newLocalMarker(m))
