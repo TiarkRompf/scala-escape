@@ -498,8 +498,7 @@ class FinerGrain2ndClassAttempt extends CompilerTesting {
     withFile("/some/chars") { fOut => fOut.print(contents) }
 
     val pairs = contents.zipWithIndex // e.g., ('i', 0), ('s', 1)
-      withFileR("/some/chars") { (f: File @local[R]) =>
-        @local[R] val f = f // FIXME: workaround inference above
+      withFileR("/some/chars") { f =>
         reduce(pairs) { (p1, p2) =>
           val i = (p1._2 + p2._2) / 2
           (f.readCharAt(i), i)  // ok
