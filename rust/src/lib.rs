@@ -6,6 +6,71 @@ mod tests {
 
     struct My;                  // not Copiable by default
 
+    fn with<'b, F>(fun: &'b mut F) -> &My
+        where F: for<'a: 'b> FnMut(&'a My) -> &'b My {
+        fun(&My)
+    }
+
+    #[test]
+    #[allow(unused_mut)]
+    fn test_with() {
+        let (mut outer, outer2) = (&My, &My);
+        with(&mut |local| { // "mut" allows mutating from the closure
+            let mut inner = &My;
+            inner = local;      // ok
+
+            // outer = local;      // error
+            // outer = inner;      // error
+            outer = outer2;     // ok
+
+            // Atempts to return:
+            // &My                 // error
+            // local               // error
+            outer               // ok
+        });
+
+        with(&mut |local1| {
+            let mut inner1 = local1;
+            with(&mut |local2| {
+                // inner1 = local2;         // error
+                // local1 = local2;
+                let mut inner2 = local2; // ok
+                let mut inner = local1;  // ok
+                outer
+            });
+            outer
+        });
+    }
+
+    fn with_arg<'b, F>(fun: &F, arg: &'b My) -> &'b My
+        where F: for<'a> Fn(&'a My) -> &'a My {
+        fun(arg)
+    }
+
+    #[test]
+    fn test_with_arg() {
+        let arg = My;
+        let ret = with_arg(&|param| &param, &arg); // ok
+        let ret = with_arg(&|param| {
+            let arg_ref = &arg; // ok
+            let local = &My;
+            // local               // error
+            param               // ok
+        }, &arg);
+
+        let ret =
+            with_arg(&|param1| {
+                let ret_inner = with_arg(&|param2| {
+                    let inner1 = param1;
+                    let inner2 = param2;
+                    // param1      // error (undesirable?)
+                    param2      // ok
+                }, &arg);
+                // ret_inner       // error
+                param1          // ok
+            }, &arg);
+    }
+
     #[test]
     fn liveness_and_fields() {
         let x = &mut (0, 1);
