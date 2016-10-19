@@ -44,6 +44,7 @@ lazy val library = project settings (scalaModuleOsgiSettings: _*) settings (Mima
     "org.scala-lang" % "scala-compiler"  % scalaVersion.value % "test",
     "junit"          % "junit"           % "4.11" % "test",
     "com.novocode"   % "junit-interface" % "0.10" % "test",
+    "com.chuusai" %% "shapeless" % "2.3.2",
     //add scala-offheap
     "sh.den"         % "scala-offheap_2.11" % "0.1"),
 
