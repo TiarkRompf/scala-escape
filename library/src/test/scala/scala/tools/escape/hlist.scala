@@ -9,7 +9,9 @@ import scala.language.implicitConversions
 import shapeless._, shapeless.test.{illTyped,sameTyped,showType,typed}
 
 object HListTest {
-  def isDistinct[L <: HList](l: L)(implicit ev: IsDistinctConstraint[L]) = true
+  def isDistinct[L <: HList](l: L)(implicit ev: IsDistinctConstraint[L]) {}
+  def notContains[L <: HList, U](l: L, e: U)(implicit ev: NotContainsConstraint[L, U]) = true
+  // def contains[L <: HList, U](l: L, e: U)(implicit ev: ContainsConstraint[L, U]) = true
 
   implicit val ctx: HNil = HNil // need type ascription (otherwise singleton)
 
@@ -21,7 +23,7 @@ object HListTest {
 
   val outerStr = "foo"
   val outerStrN = outerStr.narrow
-  val outerStr2 = "bar"
+  val outerStr2 = outerStr //"bar"
   val outerInt = 42
 
   import tag.@@
@@ -78,7 +80,7 @@ object HListTest {
     // implicit def toImm[V, L <: HList](v: V)(implicit ctx: L) = //: Imm.Aux[V, L] =
     //   new Imm(v) { type A = V; type C = L }
 
-    class Mut[V <: Singleton, L <: HList // must be V (also consistent with Rust)
+    class Mut[V/* <: Singleton*/, L <: HList // must be V (also consistent with Rust)
     ](v0: V)(                 // TODO: does class parameter makes sense?
       implicit val ctx: L
     ) { self =>
@@ -102,8 +104,8 @@ object HListTest {
       illTyped(""" m.set(42) """)
     }
 
-    trait I // tag type for immutable
     trait M // tag type for mutable
+    trait I extends M // tag type for immutable
 
     def bind[H, T <: HList, U](v: Imm[H, T]) //(ctx: T) // ctx moved into Imm
       (body: (v.A @@ I) :: T => U) = body(tag[I](v.value) :: v.ctx)
@@ -118,26 +120,37 @@ object HListTest {
     { implicit ctx => //: Imm[String] :: HNil =>
       implicitly[String :: HNil]
       implicitly[(String @@ I) :: HNil]
+      illTyped("""
+        implicitly[(String @@ M) :: HNil]
+      """)
       isDistinct(ctx)
       typed[String :: HNil](ctx)
+      typed[(String @@ I) :: HNil](ctx)
 
       bind(outerInt)//(ctx)
       { implicit ctx => // FIXME: typo in ctx causes error in inner bind scope
         isDistinct(ctx)
         typed[Int :: String :: HNil](ctx)
-        typed[Int :: String :: HNil](ctx)
+        typed[Int :: (String @@ I) :: HNil](ctx)
         isPure(ctx)
 
         bind(outerStr)//(ctx)
         { implicit ctx =>
+          // contains(ctx, tag[I]("foo"))
+          val iStr: String @@ I = tag[I]("foo")
+          notContains(ctx, iStr)
+          notContains(ctx, tag[I](outerStr))
+          notContains(ctx, tag[M]("foo"))
+          implicitly[(String @@ I) :: Int :: (String @@ I) :: HNil]
+          // implicitly[(String @@ M) :: Int :: (String @@ I) :: HNil]
           // illTyped("""
             isDistinct(ctx)
           // """)
         }
 
-        // bind(outerStr2) { implicit ctx =>
-        //   isDistinct(ctx)
-        // }
+        bind(outerStr) { implicit ctx =>
+          isDistinct(ctx)
+        }
       }
 
       bindMut(outerInt) { implicit ctx =>
