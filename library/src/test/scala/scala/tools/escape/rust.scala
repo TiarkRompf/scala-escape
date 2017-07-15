@@ -8,6 +8,132 @@ import scala.annotation._
 import scala.language.{ implicitConversions, higherKinds }
 import scala.util.escape._
 
+import shapeless._, shapeless.test.{illTyped,sameTyped,showType,typed}
+import syntax.singleton._ // for narrow
+import tag.@@
+
+object MutSamePrivilegeAndUnrelated {
+
+  class Mut[T]
+  class Imm[-T] // [S, -T <: S]() // extends Mut[S]()
+
+  class LowPriorityMutability
+  object LowPriorityMutability {
+    implicit def vToMut[T](v: T): Var[T, Mut[T]] = new Var[T, Mut[T]](v)
+  }
+
+  object Var {
+    implicit def vToImm[T](v: T): Var[T, Imm[T]] = new Var[T, Imm[T]](v)
+  }
+  class Var[T, A/*: Aliased*/](private var v: T)
+  // (implicit ev: Aliased[A]
+      extends LowPriorityMutability {
+    def value = v
+    def value_=(v2: T)(implicit ev: A =:= Mut[T]) // allow only for mutable
+    { v = v2 }
+  }
+
+  def bindImm[T, U](@local ref: Var[T, Imm[T]])(
+    @local fn: Var[T, Imm[T]] -> U) = fn(new Var[T, Imm[T]](ref.value))
+
+  // def bindMut[T, U](v: T)(
+  def bindMut[T, U](v: Var[T, Mut[T]])(@local fn: Var[T, Mut[T]] -> U) =
+    fn(v)
+  // {
+  //   //   import Aliased._
+  //   // implicit val ev = new MutWitness[T](v)
+  //   implicit val vWitness = v
+  //   val vEv = implicitly[Mut[T]]
+  //   // val ev = implicitly[MutWitness[T]]
+  //   fn(new Var[T, Mut[T]](v)// (new MutWitness[T](v))
+  //   )
+  // }
+
+  // STATIC TEST
+
+  // // TODO(lo) why this doesn't work?
+  // illTyped { """
+  //     bindImm(1) { one =>
+  //       one.value = 2
+  //     }
+  // """ }
+
+  bindImm(1) { one =>
+    // one.value = 2 // error (setter not enabled for immutable)
+  }
+
+  bindMut(42) { mut =>
+    mut.value = 21
+
+    // bindMut(mut) { mutSame => } // error (mut is not 1st-class)
+    // val mutSame = mut // error (mut is not 1st-class)
+    bindMut(42) { mut42 => } // ok (another instance initialized to same value)
+
+    // bindImm(mut) { imm => } // error (mut is not 1st-class ref nor a value)
+    bindImm("value") { imm => // ok
+      // bindMut(imm) { mutOfImm => } // error (imm is not 1st-class)
+      bindImm(imm) { imm2 => } // ok (imm is 2nd-class)
+    }
+  }
+
+  // IGNORE BELOW (other failed attempts)
+
+  // type classes
+  class Aliased[T]
+  object Aliased {
+    // implicit object MutWitness extends Aliased[Mut[_]]
+    // implicit object ImmWitness extends Aliased[Imm[_]]
+    implicit class MutWitness[T](mut: Mut[T]) extends Aliased[Mut[T]]
+    implicit class ImmWitness[T](t: T) extends Aliased[Imm[T]]
+    // implicit def showMut[T](implicit t: T): Aliased[Mut[T]] = new MutWitness[T](t)
+  }
+
+  // TODO(md) should we NOT allow mutable variables?
+  // def bindImm[T, U, A: Aliased](@local ref: Var[T, A])(
+  //   @local fn: Var[T, A/*Imm[T, T]*/] -> U) = {
+  //   @local val vr = new Var[T, A](ref.value)
+  //   fn(vr)
+  // }
+
+  // def bindImm[T, U](v: T)(@local fn: `->`[Var[T, Imm[T, T]], U]) =
+  //   fn(new Var[T, Imm[T, T]](v))
+  // def bindImm[T, U](ref: Var[T, Mut[T]])(
+  //   @local fn: Var[T, Mut[T]] -> U) = fn(
+  //   ref.value // new Var[T, Mut[T]](ref.value)
+  // )
+
+  // // def bindMut[T, U](v: T)(
+  // def bindMut[T, U](v: Var[T, Mut[T]])(
+  //   @local fn: Var[T, Mut[T]] -> U) = {
+  //   import Aliased._
+  //   // implicit val ev = new MutWitness[T](v)
+  //   implicit val vWitness = v
+  //   val vEv = implicitly[Mut[T]]
+  //   // val ev = implicitly[MutWitness[T]]
+  //   fn(new Var[T, Mut[T]](v)// (new MutWitness[T](v))
+  //   )
+  // }
+
+  bindMut(0) { m =>
+    // @local val i = (mut: Mut[Imm[Int, Int]]) // TODO(hi) symbol value <error>
+    // bindImm(mut) { mut =>
+    //   mut.value = 2
+    //   imm.value = 34
+    //   val imm2: Imm[Any, Int] = imm
+    // }
+  }
+}
+
+class MutSamePrivilegeAndUnrelated extends CompilerTesting {
+  // @Test def testCannotReassignImmutable = expectEscErrorOutput(
+  //   "",
+  //   """
+  //   bindImm(1) { one =>
+  //     one.value = 2
+  //   }
+  //   """)
+}
+
 class MutHigherPrivileged extends CompilerTesting {
 
   // Refresher: `->*`[P, T, U] desugars to: (@local[P] T) => U
